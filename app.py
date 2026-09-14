@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# Custom Styling
+# Custom Styling (Fixed Button Colors & Contrast)
 # ---------------------------------------------------------
 st.markdown("""
 <style>
@@ -23,6 +23,40 @@ st.markdown("""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
+    /* ---------------- BUTTON STYLING FIX ---------------- */
+    div.stButton > button {
+        background: #4f46e5 !important;           /* Clear Purple / Indigo base */
+        color: #ffffff !important;                   /* Crystal clear white text */
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
+        border-radius: 20px !important;              /* Rounded pill buttons */
+        font-weight: 600 !important;
+        font-size: 0.82rem !important;
+        padding: 6px 16px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+
+    div.stButton > button:hover {
+        background: #6366f1 !important;           /* Bright on hover */
+        color: #ffffff !important;
+        border-color: #ffffff !important;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4) !important;
+    }
+
+    div.stButton > button:active {
+        background: #3730a3 !important;
+        color: #ffffff !important;
+        transform: translateY(0px);
+    }
+    
+    div.stButton > button:disabled {
+        background: rgba(255, 255, 255, 0.08) !important;
+        color: #6c789d !important;
+        border-color: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    /* Metric Cards */
     .metric-card {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -90,6 +124,7 @@ st.markdown("""
         margin-bottom: 8px;
     }
     
+    /* Table Styling */
     .tracker-table {
         width: 100%;
         border-collapse: collapse;
@@ -189,7 +224,6 @@ def go_today():
 # ---------------------------------------------------------
 cur_date = st.session_state.selected_date
 
-# Calculate Sun-Sat Range
 days_since_sunday = (cur_date.weekday() + 1) % 7
 start_of_week = cur_date - datetime.timedelta(days=days_since_sunday)
 end_of_week = start_of_week + datetime.timedelta(days=6)
@@ -240,7 +274,7 @@ with col_left:
 
 with col_center:
     st.markdown("""<div class="header-center">
-        <div style="font-size: 1.2rem; font-weight: 700;">📦 AUH1 Daily Updates</div>
+        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 6px;">📦 AUH1 Daily Updates</div>
     </div>""", unsafe_allow_html=True)
     
     nav_c1, nav_c2, nav_c3 = st.columns([1, 2, 1])
@@ -255,7 +289,7 @@ with col_center:
     with nav_c3:
         st.button("Next Day ▶", on_click=go_next, use_container_width=True)
         
-    btn_c1, btn_c2, btn_c3 = st.columns([1, 1, 1])
+    btn_c1, btn_c2, btn_c3 = st.columns([1, 1.2, 1])
     with btn_c2:
         st.button("✨ TODAY", on_click=go_today, use_container_width=True)
 
@@ -273,7 +307,7 @@ with col_right:
     </div>""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Subheaders & Buttons
+# Subheaders & Report Buttons
 # ---------------------------------------------------------
 now_str = datetime.datetime.now(AUH_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
 formatted_tz = f"{now_str[:-2]}:{now_str[-2:]}"
@@ -282,14 +316,14 @@ st.markdown(f"""<div style="text-align:center; font-size: 0.75rem; color: #727e9
     Last updated: {formatted_tz}
 </div>""", unsafe_allow_html=True)
 
-rep_col1, rep_col2, rep_col3, rep_col4 = st.columns([2, 1, 1, 2])
+rep_col1, rep_col2, rep_col3, rep_col4 = st.columns([2, 1.2, 1.2, 2])
 with rep_col2:
     st.button("📊 Daily Report", use_container_width=True)
 with rep_col3:
     st.button("📈 Weekly Report", use_container_width=True)
 
 # ---------------------------------------------------------
-# Clean Table HTML Generation (Single-line concatenation)
+# Clean Table HTML Generation
 # ---------------------------------------------------------
 table_rows = []
 for member in daily_records:
@@ -319,5 +353,4 @@ table_html = (
     '</table>'
 )
 
-# Render cleaned table
 st.html(table_html)
