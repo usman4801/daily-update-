@@ -233,7 +233,6 @@ def load_real_data(site, start_d, end_d):
     all_files = sorted(glob.glob(f"*{site}*.xlsx"), reverse=True)
     valid_files = []
     
-    # Matching Dates from File Name
     for f in all_files:
         match = re.search(r'(\d{8})', f)
         if match:
@@ -255,7 +254,6 @@ def load_real_data(site, start_d, end_d):
             if 'Roster' in xls.sheet_names:
                 df = pd.read_excel(f, sheet_name='Roster')
                 
-                # Dynamic Header Finding
                 header_idx = 0
                 for i, row in df.head(15).iterrows():
                     row_strs = [str(val).strip() for val in row.values]
@@ -277,10 +275,8 @@ def load_real_data(site, start_d, end_d):
         return pd.concat(dfs, ignore_index=True)
     return pd.DataFrame()
 
-# Load Original DataFrame
 df = load_real_data(selected_site, start_date, end_date)
 
-# Process Original Data
 total_emp_count = 0
 total_sick = 0
 one_day_events = 0
@@ -290,15 +286,12 @@ chart_fig = go.Figure()
 
 if not df.empty:
     latest_date = df['Date'].max()
-    # Unique Employees in this duration
     total_emp_count = df['EMP Name'].nunique()
     
-    # Filter Only Sick Leaves (SL)
     sick_df = df[df['Attendance'].astype(str).str.upper() == 'SL'].copy()
     total_sick = len(sick_df)
     
     if not sick_df.empty:
-        # Calculate Real 1-Day vs 2+ Days Patterns
         sick_df = sick_df.sort_values(by=['EMP Name', 'Date'])
         for emp, group in sick_df.groupby('EMP Name'):
             dates = sorted(group['Date'].tolist())
@@ -316,7 +309,6 @@ if not df.empty:
                 if cons == 1: one_day_events += 1
                 elif cons >= 2: two_day_events += 1
                 
-        # Generate Employees Table based on actual risk (Top 5)
         sl_counts = sick_df.groupby(['EMP Name', 'Department']).agg(
             events=('Date', 'count'),
             last_date=('Date', 'max')
@@ -339,7 +331,6 @@ if not df.empty:
                 "bg": bg
             })
             
-        # Daily Chart Data Generation
         daily_sick = sick_df.groupby('Date').size().reset_index(name='count')
         chart_fig.add_trace(go.Scatter(
             x=daily_sick['Date'], y=daily_sick['count'], 
@@ -347,7 +338,6 @@ if not df.empty:
             line=dict(color='#2563eb', width=2.5), marker=dict(size=6)
         ))
 
-# Ensure chart looks correct even if empty
 chart_fig.update_layout(
     height=200, margin=dict(l=25, r=10, t=10, b=20),
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
@@ -359,14 +349,12 @@ chart_fig.update_layout(
 col_main, col_side = st.columns([7.4, 2.6])
 
 with col_main:
-    # 1. Hero Banner Image
     try:
         st.image("banner.png", use_container_width=True)
     except:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # 2. Original Data Metric KPI Cards
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -415,7 +403,6 @@ with col_main:
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    # 3. Chart + Key Insights
     c_chart, c_insight = st.columns([6, 4])
     with c_chart:
         st.markdown(f"""
@@ -454,7 +441,6 @@ with col_main:
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    # 4. Employees Table (Dynamic)
     rows_str = ""
     if table_data:
         for r in table_data:
@@ -490,7 +476,6 @@ with col_main:
     </div>
     """, unsafe_allow_html=True)
 
-    # Bottom Gradient Action Strip
     st.markdown("""
     <div style="background: linear-gradient(90deg, #0284c7, #2563eb); border-radius: 10px; padding: 9px 16px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; color: white; font-size: 11.5px; font-weight: 600;">
         <span>From attendance data to meaningful actions</span>
@@ -502,29 +487,22 @@ with col_main:
     </div>
     """, unsafe_allow_html=True)
 
-
 with col_side:
-    # 1. AI Assistant Card (Updated Name to Hi PXT! and Robot Moved Up)
-    st.markdown(f"""
-    <div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
-        <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
-            <span style="font-size:14px;">🤖</span> AI ASSISTANT
-        </div>
-        
-        <!-- Robot image moved up to align with Data Synced text -->
-        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:-10px; top:20px; width:100px; z-index: 1; opacity: 0.95;">
-        
-        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0; position: relative; z-index: 2;">Data Synced!</div>
-        <div style="font-size:13px; line-height:1.5; opacity:0.95; width:65%; margin-bottom:20px; position: relative; z-index: 2;">
-            Hi PXT! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
-        </div>
-        <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
-            View Insights →
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # BUG FIXED HERE: Removed all blank lines inside this markdown string so Streamlit doesn't render it as a Code Block
+    st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
+<div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
+<span style="font-size:14px;">🤖</span> AI ASSISTANT
+</div>
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:-10px; top:20px; width:100px; z-index: 1; opacity: 0.95;">
+<div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0; position: relative; z-index: 2;">Data Synced!</div>
+<div style="font-size:13px; line-height:1.5; opacity:0.95; width:65%; margin-bottom:20px; position: relative; z-index: 2;">
+Hi PXT! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
+</div>
+<div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
+View Insights →
+</div>
+</div>""", unsafe_allow_html=True)
 
-    # 2. Action Links
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px; padding: 10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid #f8fafc;">
@@ -542,7 +520,6 @@ with col_side:
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. Dynamic Donut Chart (Based on Real 1 vs 2+ Days)
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px;">
         <div class="box-header">📊 Leave Duration Breakdown</div>
@@ -575,7 +552,6 @@ with col_side:
     else:
          st.markdown("<div style='text-align:center; padding: 20px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data to Display</div></div>", unsafe_allow_html=True)
 
-    # 4. Recent Coaching Activity (Dynamic Fallback)
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px;">
         <div class="box-header">
@@ -598,7 +574,6 @@ with col_side:
         
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # 5. Quote Card at Bottom Right
     st.markdown("""
     <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
         <div style="font-size:10.5px; color:#166534; font-weight:600; line-height:1.3;">
