@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import glob
 import os
+import datetime
 
 st.set_page_config(
     page_title="Amazon People Analytics",
@@ -92,24 +93,30 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Top Search Bar */
-    .topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 14px;
+    /* Widget Customization for Thin Date Picker & Selectbox */
+    div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label {
+        display: none !important;
     }
-    .search-box {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 20px;
-        padding: 8px 18px;
-        font-size: 12.5px;
-        width: 440px;
-        color: #64748b;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+    div[data-testid="stDateInput"] div[data-baseweb="input"],
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+        border-radius: 20px !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        border: 1px solid #e2e8f0 !important;
+        background-color: white !important;
+    }
+    div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within,
+    div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 0 1px #38bdf8 !important;
+    }
+    div[data-testid="stDateInput"] input,
+    div[data-testid="stSelectbox"] div[class*="singleValue"] {
+        font-size: 12.5px !important;
+        color: #64748b !important;
+        padding-left: 8px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
 
     /* Metric KPI Cards */
@@ -182,7 +189,6 @@ st.markdown("""
         font-weight: 700;
     }
     
-    /* Remove padding around images if needed */
     [data-testid="stImage"] img {
         border-radius: 14px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -217,13 +223,16 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- TOP BAR -----------------
-st.markdown("""
-<div class="topbar">
-    <div class="search-box">
-        <span>🔍</span> Search by employee, department, or team...
-    </div>
-    <div style="display:flex; align-items:center; gap:18px;">
+# ----------------- TOP BAR (Calendar & Site Dropdown) -----------------
+top_col1, top_col2, top_col3 = st.columns([1.5, 1.2, 5.5])
+
+with top_col1:
+    selected_date = st.date_input("Select Date", datetime.date.today(), label_visibility="collapsed")
+with top_col2:
+    selected_site = st.selectbox("Site", ["AUH1", "DXB", "DXB3"], label_visibility="collapsed")
+with top_col3:
+    st.markdown("""
+    <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 2px;">
         <span style="font-size:12px; color:#64748b; font-weight:700;">⚡ Filters</span>
         <span style="font-size:16px;">🔔</span>
         <div style="display:flex; align-items:center; gap:10px;">
@@ -234,14 +243,15 @@ st.markdown("""
             <div style="width:34px; height:34px; border-radius:50%; background:#fed7aa; display:flex; align-items:center; justify-content:center; font-size:16px;">👩‍💼</div>
         </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 # ----------------- MAIN LAYOUT -----------------
 col_main, col_side = st.columns([7.4, 2.6])
 
 with col_main:
-    # 1. Hero Banner Image (Fixed to banner.png)
+    # 1. Hero Banner Image
     try:
         st.image("banner.png", use_container_width=True)
     except:
@@ -397,7 +407,7 @@ with col_main:
 
 
 with col_side:
-    # 1. AI Assistant Card - WITH 3D ROBOT
+    # 1. AI Assistant Card
     st.markdown("""
     <div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
         <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
@@ -410,7 +420,6 @@ with col_side:
         <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
             View Insights →
         </div>
-        <!-- 3D Robot Image properly aligned -->
         <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:-5px; bottom:-5px; width:110px; z-index: 1;">
     </div>
     """, unsafe_allow_html=True)
