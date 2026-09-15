@@ -203,7 +203,6 @@ with top_col2:
     default_end = datetime.date(2026, 9, 4)
     selected_dates = st.date_input("Date Range", value=(default_start, default_end), label_visibility="collapsed")
 with top_col3:
-    # Updated user profile section (Removed HR Manager, changed to javmuhak, added Amazon icon)
     st.markdown("""
     <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 2px;">
         <span style="font-size:12px; color:#64748b; font-weight:700;">⚡ Filters</span>
@@ -505,20 +504,23 @@ with col_main:
 
 
 with col_side:
-    # 1. AI Assistant Card (Updated Name to javmuhak)
+    # 1. AI Assistant Card (Updated Name to Hi PXT! and Robot Moved Up)
     st.markdown(f"""
     <div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
         <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
             <span style="font-size:14px;">🤖</span> AI ASSISTANT
         </div>
-        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0;">Data Synced!</div>
-        <div style="font-size:13px; line-height:1.5; opacity:0.95; width:70%; margin-bottom:20px;">
-            Hi javmuhak! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
+        
+        <!-- Robot image moved up to align with Data Synced text -->
+        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:-10px; top:20px; width:100px; z-index: 1; opacity: 0.95;">
+        
+        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0; position: relative; z-index: 2;">Data Synced!</div>
+        <div style="font-size:13px; line-height:1.5; opacity:0.95; width:65%; margin-bottom:20px; position: relative; z-index: 2;">
+            Hi PXT! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
         </div>
         <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
             View Insights →
         </div>
-        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:-5px; bottom:-5px; width:110px; z-index: 1;">
     </div>
     """, unsafe_allow_html=True)
 
