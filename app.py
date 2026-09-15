@@ -1,247 +1,439 @@
 
-from flask import Flask, render_template_string
+import re
+from pathlib import Path
+from datetime import datetime, timedelta
 
-app = Flask(__name__)
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 
-HTML = r"""
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Leave Compliance & Attendance Intelligence Monitor | Abu Dhabi</title>
+st.set_page_config(
+    page_title="DWD Leave Compliance & Attendance Intelligence Monitor | Abu Dhabi",
+    page_icon="▣",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+DATA_DIR = Path(__file__).parent / "AUH 1"
+DWD_RE = re.compile(r"^DWD-AUH1-(\d{8})\.xlsx$", re.I)
+
+# ---------- Design ----------
+st.markdown("""
 <style>
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:#f3f7fb;color:#142b4d}
-body{overflow-x:auto}
-:root{
- --navy:#131921;--side:#10243d;--orange:#ff9900;--blue:#2877d7;--green:#19a766;
- --border:#dce6f0;--muted:#61758f;--red:#ef3b3b;--purple:#7358d8;
+:root {
+  --navy:#131921;
+  --navy2:#172f4d;
+  --orange:#ff9900;
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --line:#dbe5f0;
+  --text:#142b4a;
+  --muted:#60758f;
+  --green:#13a56b;
+  --red:#ef4444;
+  --amber:#f59e0b;
 }
-.app{min-height:100vh;background:linear-gradient(135deg,#edf3f8 0,#f8fafc 50%,#edf3f8 100%)}
-.header{height:68px;background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 22px 0 28px;gap:20px;box-shadow:0 2px 7px #07111e55}
-.logo{font-size:31px;font-weight:800;letter-spacing:-1.5px;line-height:1}
-.logo:after{content:"";display:block;width:38px;height:8px;border-bottom:4px solid var(--orange);border-radius:50%;transform:translate(34px,-5px) rotate(-6deg)}
-.sep{height:30px;width:1px;background:#9ba6b4}
-.title{font-size:17px;font-weight:800;letter-spacing:.1px;flex:1}.title b{color:var(--orange);margin:0 10px}
-.head-icons{display:flex;align-items:center;gap:21px;font-size:18px}.bell{position:relative}.badge{position:absolute;right:-9px;top:-8px;background:#ff7a00;border-radius:50%;font-size:10px;padding:3px 5px;font-weight:800}.user{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700}.avatar{width:28px;height:28px;border-radius:50%;background:#eef2f7;color:#74859a;display:grid;place-items:center;font-size:17px}
-
-.shell{display:flex;min-width:1220px}
-.sidebar{width:190px;min-height:calc(100vh - 68px);background:linear-gradient(#10243d,#0e2138);color:#dce8f5;padding:16px 9px;position:relative}
-.side-logo{font-size:27px;font-weight:800;color:#fff;padding:4px 20px 19px}.side-logo:after{content:"";display:inline-block;width:28px;height:6px;border-bottom:3px solid var(--orange);border-radius:50%;transform:translate(-26px,8px) rotate(-8deg)}
-.nav{display:flex;align-items:center;gap:13px;height:43px;margin:3px 4px;padding:0 13px;border-radius:7px;font-size:13px;font-weight:600;white-space:nowrap}.nav.active{background:var(--orange);color:#fff}.nav .ico{font-size:18px;width:17px;text-align:center}.side-bottom{position:absolute;bottom:20px;left:28px;color:#fff;line-height:1.55;font-size:12px}.side-bottom strong{font-size:16px}
-
-main{flex:1;padding:17px 18px 22px;min-width:1030px}
-.filters{display:grid;grid-template-columns:1.05fr 1.22fr 1.65fr .75fr;gap:14px;margin-bottom:14px}
-.filter label{display:block;color:#536a87;font-size:11px;font-weight:700;margin:0 0 5px 7px}
-.field{height:42px;background:#fff;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;padding:0 11px;color:#394b64;font-size:12px;box-shadow:0 1px 2px #152c4810}
-.field .small{font-size:16px;margin-right:9px;color:#6c809a}.field .arrow{margin-left:auto;font-size:17px}.search{color:#8a99ab}.updated{font-size:9px;line-height:1.45;padding-left:13px}.updated b{font-size:9px;color:#536a87}.updated strong{font-size:10px;color:#536a87}
-
-.columns{display:grid;grid-template-columns:1.02fr .98fr;gap:14px;align-items:start}
-.card{background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 2px 9px #0e2b4812;padding:10px;margin-bottom:11px}
-.card-head{height:40px;display:flex;align-items:center;gap:9px}.head-icon{width:35px;height:35px;border-radius:9px;background:#fff0da;color:#ef9000;display:grid;place-items:center;font-size:19px;font-weight:800}.card-head h2{font-size:17px;margin:0;font-weight:800;color:#152e50}.sub{font-size:10px;color:#647995;margin:1px 0 0 44px}.link{margin-left:auto;color:#ef8b00;font-size:10px;font-weight:800;cursor:pointer}.hero{padding:10px 10px 11px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;right:-8px;top:-22px;width:115px;height:70px;background:linear-gradient(135deg,transparent 0 38%,#ffd99b 39% 59%,#ff9900 60% 100%);border-radius:30px;opacity:.9}
-
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}.kpi{border:1px solid #d8e5f1;border-radius:8px;min-height:91px;padding:11px 12px;background:linear-gradient(#fff,#f9fcff)}.kpi-label{font-size:11px;font-weight:800;color:#183352}.kpi-value{font-size:28px;font-weight:800;margin:5px 0 3px;color:#122b4c}.delta{font-size:9px}.red{color:#ef3b3b}.green{color:#19a766}
-
-.details-title{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:9px}.details-title .collapse{margin-left:auto;color:#60758e}
-.mini-grid{display:grid;grid-template-columns:1.12fr 1fr;gap:8px}.mini{border:1px solid #dce6f0;border-radius:8px;padding:7px;background:#fff}.mini h3{font-size:10px;margin:0 0 7px;font-weight:800}.mini2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-table{width:100%;border-collapse:separate;border-spacing:0;font-size:8.6px;color:#314963}th{background:#f5f8fc;color:#4d6681;font-weight:800;border-bottom:1px solid #d9e3ee;padding:6px 4px;text-align:center}td{padding:6px 4px;border-bottom:1px solid #e8eef5;text-align:center}tbody tr:last-child td{border-bottom:0}.bad{color:#e22e38;background:#fff0f1}.good{color:#148b5a;background:#eefbf5}.rate{font-weight:700}.agency td:first-child{text-align:left}.agency th:first-child{text-align:left}
-
-.chart{height:145px;position:relative;padding:4px 4px 0}.bars{height:115px;display:flex;align-items:flex-end;justify-content:space-around;border-bottom:1px solid #d8e3ee;background:repeating-linear-gradient(to top,transparent 0,transparent 27px,#eaf0f6 28px)}.barwrap{width:13%;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:0;position:relative}.bar{width:70%;background:var(--blue);border-radius:3px 3px 0 0;min-height:4px}.bar.o{background:#ff9900}.bar.c{background:#20a8bd}.bar.p{background:#7967d9}.bar.g{background:#7b8794}.barlabel{position:absolute;bottom:-20px;font-size:7px;color:#5c7087;white-space:nowrap}.barvalue{position:absolute;top:calc(100% - var(--h) - 13px);font-size:8px;font-weight:800;color:#233b57}
-.svgchart{width:100%;height:158px}.legend{display:flex;gap:13px;justify-content:center;font-size:8px;color:#536a83;margin-top:-2px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}
-
-.pattern{margin-top:11px}.pattern-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.pattern-box h3{font-size:10px;margin:0 0 7px;line-height:1.3}.tag{float:right;border-radius:12px;padding:3px 7px;font-size:8px;font-weight:800}.tag.a{background:#ffe0e3;color:#dc2c3c}.tag.b{background:#ddf8e9;color:#178653}.pattern-table{overflow:hidden;border:1px solid #dce6f0;border-radius:7px}.pattern-table table{font-size:8px}.risk-high{color:#fff;background:#ef4444;border-radius:9px;padding:3px 7px;font-weight:800}.risk-mid{color:#7c4500;background:#ffd66b;border-radius:9px;padding:3px 7px;font-weight:800}.risk-low{color:#fff;background:#18a566;border-radius:9px;padding:3px 7px;font-weight:800}
-
-.stack{height:210px;position:relative;padding-top:10px}.stack svg{width:100%;height:190px}.callout{position:absolute;top:3px;background:#ff9900;color:white;font-size:8px;font-weight:800;border-radius:3px;padding:4px 7px}.callout.mon{left:25%}.callout.fri{right:9%}.callout:after{content:"";position:absolute;left:50%;top:100%;border:5px solid transparent;border-top-color:#555;transform:translateX(-50%)}
-
-.def{margin-top:10px}.def table{font-size:8px}.def th{line-height:1.05}.valid{color:#168f5d;font-weight:800}.check{display:inline-grid;place-items:center;background:#18aa67;color:#fff;width:14px;height:14px;border-radius:50%;margin-right:3px;font-size:9px}
-
-.modal{display:none;position:fixed;inset:0;background:#08162699;z-index:20;align-items:center;justify-content:center;padding:30px}.modal.show{display:flex}.modal-box{width:min(1050px,94vw);max-height:90vh;overflow:auto;background:#f7fafc;border-radius:12px;box-shadow:0 18px 60px #0007;border:1px solid #cbd8e6}.modal-head{background:var(--navy);color:#fff;padding:14px 18px;display:flex;align-items:center}.modal-head h2{margin:0;font-size:16px}.close{margin-left:auto;background:#fff1;color:white;border:1px solid #ffffff55;border-radius:5px;padding:5px 9px;cursor:pointer}.modal-body{padding:14px}.portal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.portal-kpi{background:#fff;border:1px solid var(--border);border-radius:8px;padding:13px}.portal-kpi b{font-size:10px}.portal-kpi strong{display:block;font-size:24px;margin:7px 0}.portal-section{margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px}.portal-section h3{font-size:12px;margin:0 0 10px}
-
-@media(max-width:1300px){.title{font-size:14px}.head-icons{gap:10px}.sidebar{width:175px}.shell{min-width:1120px}main{padding:14px}.columns{gap:10px}.filters{gap:9px}}
+html, body, [class*="css"] { font-family: Arial, Helvetica, sans-serif; }
+.stApp { background:var(--bg); color:var(--text); }
+.block-container { padding:0.55rem 1.15rem 1.2rem 1.15rem; max-width: 100%; }
+header[data-testid="stHeader"] { background:var(--navy); height:58px; }
+header[data-testid="stHeader"] * { color:white !important; }
+[data-testid="stSidebar"] {
+  background:linear-gradient(180deg,#102a46 0%,#0e233a 100%);
+  min-width:225px; max-width:225px;
+}
+[data-testid="stSidebar"] * { color:#fff !important; }
+[data-testid="stSidebar"] .stButton button {
+  border:0; background:transparent; color:#e8f0f9 !important;
+  text-align:left; width:100%; border-radius:8px; padding:10px 13px;
+  font-weight:600; margin:2px 0;
+}
+[data-testid="stSidebar"] .stButton button:hover { background:rgba(255,153,0,.16); }
+.brand {font-size:31px;font-weight:800;letter-spacing:-1px;margin:10px 8px 30px 8px;}
+.brand span {color:var(--orange);}
+.side-foot {margin-top:50px;padding:0 8px;color:#dbe7f4;font-size:14px;line-height:1.6;}
+.topbar {
+  height:58px; background:var(--navy); color:#fff; border-radius:0 0 8px 8px;
+  display:flex; align-items:center; padding:0 20px; font-weight:700;
+}
+.topbar .amazon {font-size:28px; margin-right:26px;}
+.topbar .sep {height:28px;width:1px;background:#8392a6;margin-right:22px;}
+.topbar .title {font-size:16px;letter-spacing:.1px;}
+.topbar .orange {color:var(--orange);margin:0 9px;}
+.filter-label {font-size:12px;color:#60758f;font-weight:700;margin:7px 0 4px 2px;}
+.card {
+  background:#fff;border:1px solid var(--line);border-radius:11px;
+  box-shadow:0 2px 8px rgba(25,55,90,.07); padding:13px 15px;
+}
+.card-title {font-size:17px;font-weight:800;color:var(--text);}
+.sub {font-size:12px;color:var(--muted);margin-top:3px;}
+.section-head {
+  display:flex;justify-content:space-between;align-items:center;
+  background:#fff;border:1px solid var(--line);border-radius:11px 11px 0 0;
+  padding:11px 14px;font-weight:800;color:var(--text);
+}
+.metric {
+  background:linear-gradient(180deg,#fff,#fbfdff); border:1px solid var(--line);
+  border-radius:10px; min-height:108px; padding:13px 15px;
+}
+.metric .label {font-size:13px;font-weight:700;color:var(--text);}
+.metric .value {font-size:31px;font-weight:850;line-height:1.1;margin-top:9px;color:#142b4a;}
+.metric .delta {font-size:11px;margin-top:7px;}
+.up {color:#ef4444}.down {color:#10a36b}
+.kpi-icon {
+ display:inline-flex;width:34px;height:34px;border-radius:50%;align-items:center;justify-content:center;
+ background:#e9f3ff;color:#2670c9;font-weight:800;float:left;margin-right:9px;
+}
+.tile {cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px 15px;
+       box-shadow:0 2px 8px rgba(25,55,90,.07);}
+.tile:hover {border-color:#f6b24d;box-shadow:0 3px 12px rgba(255,153,0,.12);}
+.orange-link {color:#e87900;font-weight:800;font-size:12px;}
+.small-note {font-size:11px;color:#71849b;}
+.flag {
+ display:inline-block;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:800;
+}
+.flag-red {background:#fee2e2;color:#b91c1c}.flag-amber {background:#fff0d5;color:#a16207}
+.flag-green {background:#dcfce7;color:#15803d}.flag-blue {background:#e0efff;color:#2563eb}
+.dataframe {border-radius:8px;}
+.stButton button[kind="secondary"] {
+ border:1px solid #e6a23c;background:#fff7e8;color:#b75c00;font-weight:800;border-radius:8px;
+}
+div[data-testid="stMetric"] {background:#fff;border:1px solid var(--line);padding:12px;border-radius:10px;}
+div[data-testid="stExpander"] {border:1px solid var(--line);border-radius:10px;background:#fff;}
+hr {border:0;border-top:1px solid #e1e8f0;margin:10px 0;}
 </style>
-</head>
-<body>
-<div class="app">
-<header class="header">
-  <div class="logo">amazon</div><div class="sep"></div>
-  <div class="title">LEAVE COMPLIANCE &amp; ATTENDANCE INTELLIGENCE MONITOR <b>|</b> ABU DHABI</div>
-  <div class="head-icons"><span class="bell">♧<i class="badge">3</i></span><span>?</span><span class="user"><span class="avatar">●</span>HR Analytics　⌄</span></div>
-</header>
-<div class="shell">
-<aside class="sidebar">
-  <div class="side-logo">amazon</div>
-  <div class="nav active"><span class="ico">⌂</span>Overview</div>
-  <div class="nav"><span class="ico">▣</span>UPL Intelligence</div>
-  <div class="nav"><span class="ico">▣</span>SL / PL Analysis</div>
-  <div class="nav"><span class="ico">⌁</span>Attendance Trends</div>
-  <div class="nav"><span class="ico">▤</span>Compliance Matrix</div>
-  <div class="nav"><span class="ico">▥</span>Reports</div>
-  <div class="nav"><span class="ico">⚙</span>Settings</div>
-  <div class="side-bottom"><strong>amazon</strong><br><br>Better People<br>Better Tomorrow</div>
-</aside>
+""", unsafe_allow_html=True)
 
-<main>
-<section class="filters">
-  <div class="filter"><label>Site / Location</label><div class="field"><span class="small">⌖</span>Abu Dhabi (ADC1)<span class="arrow">⌄</span></div></div>
-  <div class="filter"><label>Date Range</label><div class="field"><span class="small">▣</span>Apr 21, 2025 – Apr 27, 2025<span class="arrow">▣</span></div></div>
-  <div class="filter"><label>Search Associate</label><div class="field search"><span class="small">⌕</span>Enter Associate ID or Name...<span class="arrow">⌕</span></div></div>
-  <div class="filter"><label>&nbsp;</label><div class="field updated"><span style="font-size:16px;margin-right:8px">◷</span><span><b>Last Updated</b><br><strong>Apr 27, 2025　14:32</strong>　↻</span></div></div>
-</section>
+# ---------- Helpers ----------
+def clean_columns(df):
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
 
-<div class="columns">
-<section>
-  <div class="card hero">
-    <div class="card-head"><div class="head-icon">▣</div><div><h2>UPL Report</h2><div class="sub">Unplanned Leave (UPL) — Key Insights</div></div><div class="link" onclick="openModal()">View Full Report →</div></div>
-    <div class="kpis">
-      <div class="kpi"><div class="kpi-label">⚫　Total UPL Case Volume</div><div class="kpi-value">1,450</div><div class="delta red">↑ 12.5%　vs. last week</div></div>
-      <div class="kpi"><div class="kpi-label">🟢　Active Rate</div><div class="kpi-value">6.8%</div><div class="delta green">↓ 2.3%　vs. last week</div></div>
-      <div class="kpi"><div class="kpi-label">🟣　Compliance Rate</div><div class="kpi-value">93.2%</div><div class="delta green">↑ 1.7%　vs. last week</div></div>
-    </div>
-  </div>
+def parse_file_date(name):
+    m = DWD_RE.match(name)
+    if not m:
+        return None
+    return datetime.strptime(m.group(1), "%d%m%Y").date()
 
-  <div class="card pattern">
-    <div class="details-title"><span style="color:#ef9000">◉</span> Behavioral Policy Breach Pattern Identifier (1-2 Day Focus)</div>
-    <div class="pattern-grid">
-      <div class="pattern-box"><h3>1-Day Focus — Repeated Single-Day Non-Valid Cases <span class="tag a">Triage A</span></h3>
-        <div class="pattern-table"><table><thead><tr><th>Site</th><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Incidence</th><th>Risk</th></tr></thead><tbody>
-        <tr><td>ADC1</td><td>12</td><td class="bad">18</td><td>9</td><td>7</td><td>11</td><td class="bad">14</td><td>8</td><td>8.2%</td><td><span class="risk-high">72</span></td></tr>
-        <tr><td>AAN</td><td>8</td><td>11</td><td>6</td><td>5</td><td>8</td><td>9</td><td>6</td><td>5.6%</td><td><span class="risk-mid">58</span></td></tr>
-        <tr><td>DXB</td><td>4</td><td>7</td><td>5</td><td>4</td><td>6</td><td>7</td><td>5</td><td>3.9%</td><td><span class="risk-low">42</span></td></tr>
-        </tbody></table></div>
-      </div>
-      <div class="pattern-box"><h3>2-Day Focus — Consecutive 2-Day Unexcused Overrides <span class="tag b">Triage B</span></h3>
-        <div class="pattern-table"><table><thead><tr><th>Site</th><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Incidence</th><th>Risk</th></tr></thead><tbody>
-        <tr><td>ADC1</td><td>5</td><td class="bad">9</td><td>7</td><td>4</td><td>8</td><td class="bad">12</td><td>6</td><td>6.1%</td><td><span class="risk-high">68</span></td></tr>
-        <tr><td>AAN</td><td>3</td><td>5</td><td>4</td><td>3</td><td>6</td><td>8</td><td>4</td><td>4.2%</td><td><span class="risk-mid">51</span></td></tr>
-        <tr><td>DXB</td><td>1</td><td>2</td><td>2</td><td>1</td><td>3</td><td>5</td><td>2</td><td>2.1%</td><td><span class="risk-low">34</span></td></tr>
-        </tbody></table></div>
-      </div>
-    </div>
-  </div>
+@st.cache_data(show_spinner=False)
+def load_file(path_str):
+    path = Path(path_str)
+    sheets = pd.ExcelFile(path).sheet_names
+    out = {"file": path.name, "date": parse_file_date(path.name)}
+    if "Roster" in sheets:
+        raw = pd.read_excel(path, sheet_name="Roster", header=None)
+        header_idx = None
+        for i in range(min(20, len(raw))):
+            vals = raw.iloc[i].astype(str).str.strip().tolist()
+            if "AMZ ID" in vals and "EMP Name" in vals:
+                header_idx = i
+                break
+        if header_idx is not None:
+            roster = raw.iloc[header_idx+1:].copy()
+            roster.columns = [str(x).strip() for x in raw.iloc[header_idx].tolist()]
+            roster = clean_columns(roster)
+            roster = roster.dropna(how="all")
+            roster = roster[roster.get("AMZ ID", pd.Series(index=roster.index)).astype(str).str.lower().ne("amz id")]
+            out["roster"] = roster
+        else:
+            out["roster"] = pd.DataFrame()
+    else:
+        out["roster"] = pd.DataFrame()
 
-  <div class="card">
-    <div class="details-title">▣　UPL Report Details <span class="collapse">⌃</span></div>
-    <div class="mini-grid">
-      <div class="mini"><h3>▣　Day-Wise Compliance Matrix</h3><table><thead><tr><th>Day</th><th>Total Associates</th><th>Compliant</th><th>Non-Compliant</th><th>Compliance Rate</th></tr></thead><tbody>
-        <tr><td>Sun</td><td>1,820</td><td>1,742</td><td class="bad">78</td><td class="good rate">95.7%</td></tr>
-        <tr><td>Mon</td><td>1,834</td><td>1,658</td><td class="bad">176</td><td class="bad rate">90.3%</td></tr>
-        <tr><td>Tue</td><td>1,812</td><td>1,721</td><td class="bad">91</td><td class="good rate">94.9%</td></tr>
-        <tr><td>Wed</td><td>1,806</td><td>1,736</td><td class="bad">70</td><td class="good rate">96.1%</td></tr>
-        <tr><td>Thu</td><td>1,795</td><td>1,719</td><td class="bad">76</td><td class="good rate">95.8%</td></tr>
-        <tr><td>Fri</td><td>1,828</td><td>1,642</td><td class="bad">186</td><td class="bad rate">89.8%</td></tr>
-        <tr><td>Sat</td><td>1,801</td><td>1,738</td><td class="bad">63</td><td class="good rate">96.5%</td></tr>
-      </tbody></table></div>
-      <div class="mini"><h3>♟　3P Agency Breakdown <span style="float:right;font-weight:500">3P Agency UPL Volume (Altair)</span></h3>
-        <table class="agency"><thead><tr><th>Agency</th><th>Total Associates</th><th>UPL Cases</th><th>% of Total</th></tr></thead><tbody>
-        <tr><td>Randstad</td><td>520</td><td>342</td><td>23.6%</td></tr><tr><td>Manpower</td><td>468</td><td>298</td><td>20.6%</td></tr><tr><td>Adecco</td><td>412</td><td>261</td><td>18.0%</td></tr><tr><td>Kelly Services</td><td>358</td><td>223</td><td>15.4%</td></tr><tr><td>Others</td><td>289</td><td>196</td><td>13.5%</td></tr>
-        </tbody></table>
-        <div class="chart"><div class="bars">
-          <div class="barwrap"><div class="bar" style="height:86%"></div><span class="barvalue" style="top:5px">342</span><span class="barlabel">Randstad</span></div>
-          <div class="barwrap"><div class="bar o" style="height:75%"></div><span class="barvalue" style="top:18px">298</span><span class="barlabel">Manpower</span></div>
-          <div class="barwrap"><div class="bar c" style="height:65%"></div><span class="barvalue" style="top:30px">261</span><span class="barlabel">Adecco</span></div>
-          <div class="barwrap"><div class="bar p" style="height:55%"></div><span class="barvalue" style="top:43px">223</span><span class="barlabel">Kelly</span></div>
-          <div class="barwrap"><div class="bar g" style="height:49%"></div><span class="barvalue" style="top:51px">196</span><span class="barlabel">Others</span></div>
-        </div></div>
-      </div>
-    </div>
-    <div class="mini2" style="margin-top:8px">
-      <div class="mini"><h3>3. Weekly Trend (Planned vs Unplanned Leave Targets)</h3>
-        <svg class="svgchart" viewBox="0 0 520 155" preserveAspectRatio="none">
-          <g stroke="#e7edf4" stroke-width="1"><line x1="38" y1="20" x2="510" y2="20"/><line x1="38" y1="55" x2="510" y2="55"/><line x1="38" y1="90" x2="510" y2="90"/><line x1="38" y1="125" x2="510" y2="125"/></g>
-          <polygon points="40,68 115,55 190,61 265,74 340,85 415,78 505,92 505,128 40,128" fill="#2877d711"/>
-          <polyline points="40,68 115,55 190,61 265,74 340,85 415,78 505,92" fill="none" stroke="#2877d7" stroke-width="2.5"/>
-          <polyline points="40,106 115,96 190,102 265,108 340,116 415,111 505,117" fill="none" stroke="#ff9900" stroke-width="2.5"/>
-          <g fill="#2877d7"><circle cx="40" cy="68" r="3"/><circle cx="115" cy="55" r="3"/><circle cx="190" cy="61" r="3"/><circle cx="265" cy="74" r="3"/><circle cx="340" cy="85" r="3"/><circle cx="415" cy="78" r="3"/><circle cx="505" cy="92" r="3"/></g>
-          <g font-size="8" fill="#566d86"><text x="33" y="148">Sun</text><text x="108" y="148">Mon</text><text x="183" y="148">Tue</text><text x="258" y="148">Wed</text><text x="333" y="148">Thu</text><text x="408" y="148">Fri</text><text x="498" y="148">Sat</text></g>
-          <g font-size="8" fill="#2877d7" font-weight="700"><text x="37" y="61">180</text><text x="110" y="48">195</text><text x="185" y="54">188</text><text x="260" y="67">176</text><text x="335" y="78">165</text><text x="410" y="71">172</text><text x="500" y="85">160</text></g>
-          <g font-size="8" fill="#e98900" font-weight="700"><text x="37" y="101">72</text><text x="110" y="91">98</text><text x="185" y="97">86</text><text x="260" y="103">79</text><text x="335" y="111">68</text><text x="410" y="106">74</text><text x="500" y="112">63</text></g>
-        </svg><div class="legend"><span><i class="dot" style="background:#2877d7"></i>Planned Leave (Target)</span><span><i class="dot" style="background:#ff9900"></i>Unplanned Leave (Target)</span></div>
-      </div>
-      <div class="mini"><h3>4. Absence Category Distribution</h3>
-        <div style="display:flex;align-items:center;gap:14px;height:158px">
-          <svg width="145" height="145" viewBox="0 0 145 145"><circle cx="72.5" cy="72.5" r="47" fill="none" stroke="#2877d7" stroke-width="27" stroke-dasharray="161 134" transform="rotate(-90 72.5 72.5)"/><circle cx="72.5" cy="72.5" r="47" fill="none" stroke="#ff9900" stroke-width="27" stroke-dasharray="84 211" stroke-dashoffset="-161" transform="rotate(-90 72.5 72.5)"/><circle cx="72.5" cy="72.5" r="47" fill="none" stroke="#19a766" stroke-width="27" stroke-dasharray="51 244" stroke-dashoffset="-245" transform="rotate(-90 72.5 72.5)"/><text x="72.5" y="69" text-anchor="middle" font-size="17" font-weight="800" fill="#172f50">1,450</text><text x="72.5" y="83" text-anchor="middle" font-size="8" fill="#61758f">Total UPL Cases</text></svg>
-          <div style="font-size:9px;line-height:1.8"><div><span class="dot" style="background:#2877d7"></span>Medical Certified<br><b style="margin-left:11px">792 (54.5%)</b></div><div><span class="dot" style="background:#ff9900"></span>Single-day Unannounced<br><b style="margin-left:11px">411 (28.3%)</b></div><div><span class="dot" style="background:#19a766"></span>Personal Emergency<br><b style="margin-left:11px">247 (17.2%)</b></div></div>
+    if "Dashboard" in sheets:
+        out["dashboard"] = pd.read_excel(path, sheet_name="Dashboard", header=None)
+    else:
+        out["dashboard"] = pd.DataFrame()
+
+    if "DWD RAW File" in sheets:
+        out["raw"] = clean_columns(pd.read_excel(path, sheet_name="DWD RAW File"))
+    else:
+        out["raw"] = pd.DataFrame()
+    return out
+
+@st.cache_data(show_spinner=False)
+def load_all():
+    files = []
+    if DATA_DIR.exists():
+        for p in DATA_DIR.glob("DWD-AUH1-*.xlsx"):
+            d = parse_file_date(p.name)
+            if d:
+                files.append((d, p))
+    files.sort()
+    return [load_file(str(p)) for d,p in files]
+
+def safe_col(df, names):
+    for n in names:
+        if n in df.columns:
+            return n
+    return None
+
+def fmt_num(x):
+    if pd.isna(x): return "—"
+    try: return f"{int(round(float(x))):,}"
+    except: return str(x)
+
+def fmt_pct(x):
+    if pd.isna(x): return "—"
+    return f"{float(x)*100:.1f}%"
+
+def add_site_filter(df, site):
+    if not site or site == "All sites":
+        return df.copy()
+    c = safe_col(df, ["Building","Site"])
+    if not c: return df.copy()
+    return df[df[c].astype(str).str.strip().eq(site)].copy()
+
+def normalize_attendance(df):
+    c = safe_col(df, ["Attendance","Attendance "])
+    if not c:
+        return pd.Series("", index=df.index)
+    return df[c].astype(str).str.strip().str.upper()
+
+# ---------- Load actual data ----------
+bundle = load_all()
+if not bundle:
+    st.error("No valid DWD-AUH1-DDMMYYYY.xlsx files were found in the 'AUH 1' folder.")
+    st.stop()
+
+all_rosters = []
+for b in bundle:
+    r = b.get("roster", pd.DataFrame()).copy()
+    if not r.empty:
+        r["_file_date"] = b["date"]
+        all_rosters.append(r)
+history = pd.concat(all_rosters, ignore_index=True) if all_rosters else pd.DataFrame()
+
+# ---------- Sidebar ----------
+with st.sidebar:
+    st.markdown('<div class="brand">amazon<span>⌁</span></div>', unsafe_allow_html=True)
+    nav = st.radio(
+        "Navigation",
+        ["Overview","DWD Intelligence","SL / PL Analysis","Attendance Trends","Compliance Matrix","Reports","Settings"],
+        label_visibility="collapsed"
+    )
+    st.markdown('<div class="side-foot"><b>amazon</b><br><br>Better People<br>Better Tomorrow</div>', unsafe_allow_html=True)
+
+# ---------- Header ----------
+st.markdown("""
+<div class="topbar">
+  <div class="amazon">amazon</div><div class="sep"></div>
+  <div class="title">LEAVE COMPLIANCE &amp; ATTENDANCE INTELLIGENCE MONITOR
+  <span class="orange">|</span> ABU DHABI</div>
+</div>
+""", unsafe_allow_html=True)
+
+# ---------- Filters ----------
+sites = ["All sites"]
+site_col = safe_col(history, ["Building","Site"])
+if site_col:
+    vals = sorted([x for x in history[site_col].dropna().astype(str).str.strip().unique() if x])
+    if vals: sites += vals
+default_site = "AUH1" if "AUH1" in sites else sites[0]
+
+c1,c2,c3,c4 = st.columns([1.05,1.25,2.05,.9])
+with c1:
+    st.markdown('<div class="filter-label">Site / Location</div>', unsafe_allow_html=True)
+    site = st.selectbox("site", sites, index=sites.index(default_site), label_visibility="collapsed")
+with c2:
+    st.markdown('<div class="filter-label">Date Range</div>', unsafe_allow_html=True)
+    dates = [b["date"] for b in bundle if b["date"]]
+    dmin,dmax=min(dates),max(dates)
+    date_range = st.date_input("dates",(dmin,dmax),min_value=dmin,max_value=dmax,label_visibility="collapsed")
+with c3:
+    st.markdown('<div class="filter-label">Search Associate</div>', unsafe_allow_html=True)
+    search = st.text_input("associate","",placeholder="Enter Associate ID or Name...",label_visibility="collapsed")
+with c4:
+    st.markdown('<div class="filter-label">Last Updated</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="card" style="padding:8px 10px;font-size:11px"><b>Last Updated</b><br>{dmax.strftime("%b %d, %Y")} &nbsp; {datetime.now().strftime("%H:%M")}</div>', unsafe_allow_html=True)
+
+# Filter history by date and site
+if isinstance(date_range, tuple) and len(date_range)==2:
+    start,end=date_range
+else:
+    start=end=date_range
+h = history[(history["_file_date"]>=start)&(history["_file_date"]<=end)].copy()
+h = add_site_filter(h,site)
+
+if search.strip():
+    q=search.strip().lower()
+    idc=safe_col(h,["AMZ ID","EmpID","Psoft No"])
+    nc=safe_col(h,["EMP Name","Emp Name"])
+    mask=False
+    if idc: mask = h[idc].astype(str).str.lower().str.contains(q,na=False)
+    if nc: mask = mask | h[nc].astype(str).str.lower().str.contains(q,na=False)
+    h=h[mask]
+
+att=normalize_attendance(h)
+total=len(h)
+present=int((att=="P").sum())
+off=int((att=="OFF").sum())
+pl=int((att=="PL").sum())
+sl=int((att=="SL").sum())
+ab=int((att=="AB").sum())
+non_present=total-present-off
+active_rate=(non_present/total) if total else np.nan
+compliance=(present/(total-off)) if total-off else np.nan
+dwd_col=safe_col(h,["DWD dashboard"])
+dwd_present=int(h[dwd_col].astype(str).str.strip().eq("Present").sum()) if dwd_col else np.nan
+
+# ---------- Main ----------
+if nav in ["Overview","DWD Intelligence","SL / PL Analysis","Attendance Trends","Compliance Matrix","Reports"]:
+    left,right=st.columns([1.02,.98],gap="small")
+
+    with left:
+        # Clickable single DWD entry tile
+        st.markdown("""
+        <div class="tile">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="card-title">▣ &nbsp; DWD Report</div>
+              <div class="sub">Daily Workforce &amp; Unplanned Leave — Key Insights</div>
+            </div>
+            <div class="orange-link">Interactive Drill-down →</div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-</section>
+        """, unsafe_allow_html=True)
+        if st.button("Open DWD Report Details", key="dwd_open", type="secondary"):
+            st.session_state["dwd_open"] = not st.session_state.get("dwd_open",False)
 
-<section>
-  <div class="card">
-    <div class="card-head"><div class="head-icon">◉</div><div><h2>Leave Pattern &amp; Behavioral Abuse Engine <span style="font-size:10px">(SL / PL Focus)</span></h2></div><div class="link">View Insights →</div></div>
-    <div class="kpis" style="grid-template-columns:1fr 1fr">
-      <div class="kpi"><div class="kpi-label">🔵　Single-Day Strategic Leaves</div><div class="kpi-value">72</div><div style="font-size:10px">Associates flagged</div><div class="delta red" style="margin-top:12px">↑ 8.4%　vs. last week</div></div>
-      <div class="kpi"><div class="kpi-label">🔵　2-Day Consecutive Clusters</div><div class="kpi-value">35</div><div style="font-size:10px">Associates flagged<br>(with off-day adjacent patterns)</div><div class="delta red" style="margin-top:6px">↑ 25.7%　vs. last week</div></div>
-    </div>
-    <div class="mini" style="margin-top:10px"><h3>Weekly Pattern Prevalence (SL / PL)</h3>
-      <div class="stack">
-        <span class="callout mon">Monday Spike</span><span class="callout fri">Friday Spike</span>
-        <svg viewBox="0 0 620 220" preserveAspectRatio="none">
-          <g stroke="#e5ebf2" stroke-width="1"><line x1="35" y1="24" x2="605" y2="24"/><line x1="35" y1="69" x2="605" y2="69"/><line x1="35" y1="114" x2="605" y2="114"/><line x1="35" y1="159" x2="605" y2="159"/></g>
-          <g font-size="9" fill="#63768d"><text x="7" y="162">50</text><text x="7" y="117">100</text><text x="7" y="72">150</text><text x="7" y="27">200</text></g>
-          <g>
-          <rect x="55" y="130" width="38" height="29" fill="#2877d7"/><rect x="55" y="105" width="38" height="25" fill="#ff9900"/><rect x="55" y="71" width="38" height="34" fill="#19a766"/>
-          <rect x="135" y="94" width="38" height="65" fill="#2877d7"/><rect x="135" y="33" width="38" height="61" fill="#ff9900"/><rect x="135" y="0" width="38" height="33" fill="#19a766"/>
-          <rect x="215" y="113" width="38" height="46" fill="#2877d7"/><rect x="215" y="73" width="38" height="40" fill="#ff9900"/><rect x="215" y="31" width="38" height="42" fill="#19a766"/>
-          <rect x="295" y="120" width="38" height="39" fill="#2877d7"/><rect x="295" y="88" width="38" height="32" fill="#ff9900"/><rect x="295" y="53" width="38" height="35" fill="#19a766"/>
-          <rect x="375" y="125" width="38" height="34" fill="#2877d7"/><rect x="375" y="96" width="38" height="29" fill="#ff9900"/><rect x="375" y="64" width="38" height="32" fill="#19a766"/>
-          <rect x="455" y="101" width="38" height="58" fill="#2877d7"/><rect x="455" y="49" width="38" height="52" fill="#ff9900"/><rect x="455" y="0" width="38" height="49" fill="#19a766"/>
-          <rect x="535" y="135" width="38" height="24" fill="#2877d7"/><rect x="535" y="112" width="38" height="23" fill="#ff9900"/><rect x="535" y="82" width="38" height="30" fill="#19a766"/>
-          </g>
-          <g font-size="9" fill="#526981" text-anchor="middle"><text x="74" y="179">Sun</text><text x="154" y="179">Mon</text><text x="234" y="179">Tue</text><text x="314" y="179">Wed</text><text x="394" y="179">Thu</text><text x="474" y="179">Fri</text><text x="554" y="179">Sat</text></g>
-          <g font-size="8" fill="#fff" text-anchor="middle" font-weight="700"><text x="154" y="120">72</text><text x="154" y="67">68</text><text x="154" y="19">58</text><text x="474" y="122">64</text><text x="474" y="77">58</text><text x="474" y="28">54</text></g>
-        </svg>
-      </div>
-      <div class="legend"><span><i class="dot" style="background:#2877d7"></i>1-Day SL</span><span><i class="dot" style="background:#ff9900"></i>2-Day SL Cluster</span><span><i class="dot" style="background:#19a766"></i>1-Day PL</span></div>
-    </div>
-  </div>
+        m1,m2,m3=st.columns(3)
+        with m1:
+            st.markdown(f'<div class="metric"><div class="label">Total DWD Case Volume</div><div class="value">{fmt_num(non_present)}</div><div class="delta up">● Source: Roster attendance</div></div>',unsafe_allow_html=True)
+        with m2:
+            st.markdown(f'<div class="metric"><div class="label">Active Rate</div><div class="value">{fmt_pct(active_rate)}</div><div class="delta">● Calculated from current file set</div></div>',unsafe_allow_html=True)
+        with m3:
+            st.markdown(f'<div class="metric"><div class="label">Compliance Rate</div><div class="value">{fmt_pct(compliance)}</div><div class="delta down">● Present / scheduled-on roster</div></div>',unsafe_allow_html=True)
 
-  <div class="card def">
-    <div class="details-title">High-Frequency Defaulters Drill-Down <span class="link">View All →</span></div>
-    <table><thead><tr><th>#</th><th>Associate ID</th><th>Name</th><th>1-Day SL<br>Count</th><th>2-Day SL<br>Cluster Count</th><th>1-Day PL<br>Count</th><th>Disruption<br>Risk Index</th><th>Medical Certificate<br>Status</th></tr></thead><tbody>
-      <tr><td>1</td><td>A102934</td><td>Ahmed Khan</td><td>6</td><td>4</td><td>3</td><td><span class="risk-high">92%</span></td><td class="valid"><span class="check">✓</span>VALIDATED<br><small>(Doctor Slip)</small></td></tr>
-      <tr><td>2</td><td>A104221</td><td>Fatima Al Mansoori</td><td>5</td><td>3</td><td>2</td><td><span class="risk-high" style="background:#ff8b19">78%</span></td><td class="valid"><span class="check">✓</span>VALIDATED<br><small>(Doctor Slip)</small></td></tr>
-      <tr><td>3</td><td>A107563</td><td>Rahil Shaikh</td><td>4</td><td>3</td><td>1</td><td><span class="risk-high" style="background:#ff7a19">65%</span></td><td class="valid"><span class="check">✓</span>VALIDATED<br><small>(Doctor Slip)</small></td></tr>
-      <tr><td>4</td><td>A109876</td><td>Saeed Al Balushi</td><td>3</td><td>2</td><td>2</td><td><span class="risk-mid">52%</span></td><td class="valid"><span class="check">✓</span>VALIDATED<br><small>(Doctor Slip)</small></td></tr>
-      <tr><td>5</td><td>A112349</td><td>Noora Al Dhaheri</td><td>3</td><td>2</td><td>1</td><td><span class="risk-mid">48%</span></td><td class="valid"><span class="check">✓</span>VALIDATED<br><small>(Doctor Slip)</small></td></tr>
-    </tbody></table>
-  </div>
-</section>
-</div>
-</main>
-</div>
-</div>
+        if st.session_state.get("dwd_open",False) or nav=="DWD Intelligence":
+            st.markdown('<div class="section-head">▣ &nbsp; DWD Report Details <span class="small-note">Calculated only from loaded DWD files</span></div>',unsafe_allow_html=True)
+            st.markdown("<div style='height:6px'></div>",unsafe_allow_html=True)
+            a,b=st.columns([1.05,.95])
+            with a:
+                st.markdown('<div class="card"><b>Day-Wise Attendance / Leave Matrix</b></div>',unsafe_allow_html=True)
+                day_rows=[]
+                for dt,g in h.groupby("_file_date"):
+                    aa=normalize_attendance(g)
+                    day_rows.append({"Date":dt.strftime("%d %b"),"Associates":len(g),"Present":int((aa=="P").sum()),
+                                     "SL":int((aa=="SL").sum()),"PL":int((aa=="PL").sum()),"Absent":int((aa=="AB").sum()),
+                                     "OFF":int((aa=="OFF").sum())})
+                if day_rows:
+                    st.dataframe(pd.DataFrame(day_rows),hide_index=True,use_container_width=True)
+            with b:
+                st.markdown('<div class="card"><b>3P Agency Breakdown</b></div>',unsafe_allow_html=True)
+                ag=safe_col(h,["3P","Agency"])
+                if ag:
+                    aa=h[ag].fillna("Unassigned").astype(str).str.strip().replace({"":"Unassigned"}).value_counts().head(8)
+                    fig=go.Figure(go.Bar(x=aa.index,y=aa.values,text=aa.values,textposition="outside"))
+                    fig.update_layout(height=270,margin=dict(l=10,r=10,t=10,b=45),paper_bgcolor="white",plot_bgcolor="white",
+                                      font=dict(color="#173252",size=11),showlegend=False)
+                    st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
+                else:
+                    st.info("Agency/3P field is not present in the source.")
 
-<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
-  <div class="modal-box">
-    <div class="modal-head"><h2>UPL Report — Full Drill-down Portal</h2><button class="close" onclick="closeModal()">Close ✕</button></div>
-    <div class="modal-body">
-      <div class="portal-grid">
-        <div class="portal-kpi"><b>Avg. Monthly UPL Rate</b><strong>8.4%</strong><span class="green">↓ 1.1% MoM</span></div>
-        <div class="portal-kpi"><b>High-Risk Associates</b><strong>142</strong><span class="red">↑ 6.2% YTD</span></div>
-        <div class="portal-kpi"><b>YTD UPL Trend</b><strong>−4.8%</strong><span class="green">Improving</span></div>
-      </div>
-      <div class="portal-section"><h3>Target Variance</h3>
-        <svg viewBox="0 0 950 190" style="width:100%;height:190px"><g stroke="#e5ebf2"><line x1="45" y1="25" x2="925" y2="25"/><line x1="45" y1="75" x2="925" y2="75"/><line x1="45" y1="125" x2="925" y2="125"/><line x1="45" y1="165" x2="925" y2="165"/></g><polyline points="50,80 195,55 340,67 485,82 630,95 775,73 920,88" fill="none" stroke="#2877d7" stroke-width="4"/><polyline points="50,125 195,104 340,116 485,123 630,137 775,128 920,143" fill="none" stroke="#ff9900" stroke-width="4"/></svg>
-      </div>
-      <div class="portal-section"><h3>Site Drill-down</h3><table><thead><tr><th>Site</th><th>UPL Cases</th><th>UPL Rate</th><th>Risk Score</th><th>Review Queue</th></tr></thead><tbody><tr><td>ADC1</td><td>1,450</td><td>6.8%</td><td>58</td><td>142</td></tr><tr><td>AAN</td><td>486</td><td>5.9%</td><td>41</td><td>67</td></tr><tr><td>DXB</td><td>392</td><td>4.7%</td><td>36</td><td>42</td></tr></tbody></table></div>
-    </div>
-  </div>
-</div>
-<script>
-function openModal(){document.getElementById('modal').classList.add('show')}
-function closeModal(){document.getElementById('modal').classList.remove('show')}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()})
-</script>
-</body>
-</html>
-"""
+            a,b=st.columns([1.25,.75])
+            with a:
+                st.markdown('<div class="card"><b>Leave / Attendance Trend — loaded dates only</b></div>',unsafe_allow_html=True)
+                if not h.empty:
+                    rows=[]
+                    for dt,g in h.groupby("_file_date"):
+                        aa=normalize_attendance(g)
+                        rows.append((dt,int((aa=="SL").sum()),int((aa=="PL").sum()),int((aa=="AB").sum())))
+                    t=pd.DataFrame(rows,columns=["Date","SL","PL","AB"]).sort_values("Date")
+                    fig=go.Figure()
+                    for col,label in [("SL","SL"),("PL","PL"),("AB","Absent")]:
+                        fig.add_trace(go.Scatter(x=t["Date"],y=t[col],mode="lines+markers",name=label,fill="tozeroy" if col=="PL" else None))
+                    fig.update_layout(height=260,margin=dict(l=10,r=10,t=10,b=35),paper_bgcolor="white",plot_bgcolor="white",
+                                      font=dict(color="#173252",size=11),legend=dict(orientation="h",y=1.12,x=0))
+                    st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
+                else: st.info("No records in selected date range.")
+            with b:
+                st.markdown('<div class="card"><b>Absence Category Distribution</b></div>',unsafe_allow_html=True)
+                labels=["SL","PL","Absent","Present"]
+                values=[sl,pl,ab,present]
+                fig=go.Figure(go.Pie(labels=labels,values=values,hole=.62,textinfo="percent"))
+                fig.update_layout(height=260,margin=dict(l=0,r=0,t=10,b=0),paper_bgcolor="white",
+                                  legend=dict(font=dict(size=10)),showlegend=True)
+                st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
 
-@app.route("/")
-def index():
-    return render_template_string(HTML)
+    with right:
+        st.markdown("""
+        <div class="tile">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="card-title">◉ &nbsp; Leave Pattern &amp; Behavioral Abuse Engine <span class="small-note">(SL / PL Focus)</span></div>
+            <div class="orange-link">View Insights →</div>
+          </div>
+        </div>
+        """,unsafe_allow_html=True)
+        k1,k2=st.columns(2)
+        with k1:
+            st.markdown(f'<div class="metric"><div class="label">Single-Day Strategic Leaves</div><div class="value">{sl}</div><div>SL records in loaded source</div><div class="delta up">● No inference of medical validity</div></div>',unsafe_allow_html=True)
+        with k2:
+            # Genuine 2-day clusters require at least two dated files for the same associate.
+            st.markdown(f'<div class="metric"><div class="label">2-Day Consecutive Clusters</div><div class="value">{"—" if len(bundle)<2 else "Calculated"}</div><div>{"Requires ≥2 dated DWD files" if len(bundle)<2 else "See pattern engine below"}</div><div class="delta">● No fabricated clusters</div></div>',unsafe_allow_html=True)
 
-if __name__ == "__main__":
-    print("Opening: http://127.0.0.1:5000")
-    app.run(host="127.0.0.1", port=5000, debug=False)
+        st.markdown('<div class="section-head">Weekly Pattern Prevalence (SL / PL)</div>',unsafe_allow_html=True)
+        # Use actual dates. If there is only one file, only that date is plotted.
+        if not h.empty:
+            rows=[]
+            for dt,g in h.groupby("_file_date"):
+                aa=normalize_attendance(g)
+                rows.append({"Date":dt,"SL":int((aa=="SL").sum()),"PL":int((aa=="PL").sum()),"Absent":int((aa=="AB").sum())})
+            t=pd.DataFrame(rows).sort_values("Date")
+            fig=go.Figure()
+            fig.add_trace(go.Bar(x=t["Date"],y=t["SL"],name="SL"))
+            fig.add_trace(go.Bar(x=t["Date"],y=t["PL"],name="PL"))
+            fig.add_trace(go.Bar(x=t["Date"],y=t["Absent"],name="Absent"))
+            fig.update_layout(barmode="stack",height=300,margin=dict(l=10,r=10,t=20,b=40),paper_bgcolor="white",plot_bgcolor="white",
+                              font=dict(color="#173252",size=11),legend=dict(orientation="h",y=1.08,x=0))
+            st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
+            if len(bundle)<7:
+                st.caption("Only loaded DWD dates are shown. Add more DWD-AUH1-DDMMYYYY.xlsx files to populate the historical pattern timeline. No missing dates are filled with synthetic values.")
+        else:
+            st.info("No source records for the selected date range.")
+
+        st.markdown('<div class="section-head">High-Frequency Defaulters Drill-Down</div>',unsafe_allow_html=True)
+        # Pattern engine: only flags repeated SL/PL activity when multiple dated files exist.
+        idc=safe_col(history,["AMZ ID","EmpID","Psoft No"])
+        nc=safe_col(history,["EMP Name","Emp Name"])
+        if idc and nc and len(bundle)>=2:
+            hh=add_site_filter(history,site)
+            hh=hh[(hh["_file_date"]>=start)&(hh["_file_date"]<=end)].copy()
+            hh["_att"]=normalize_attendance(hh)
+            grp=hh.groupby([idc,nc],dropna=False)
+            rows=[]
+            for (aid,name),g in grp:
+                dates_sl=sorted(g.loc[g["_att"]=="SL","_file_date"].dropna().unique())
+                dates_pl=sorted(g.loc[g["_att"]=="PL","_file_date"].dropna().unique())
+                two=0
+                for i in range(1,len(dates_sl)):
+                    if dates_sl[i]-dates_sl[i-1] == timedelta(days=1):
+                        two += 1
+                one=max(0,len(dates_sl)-two*2)
+                if one+two+len(dates_pl)>0:
+                    risk=min(100, one*10+two*25+len(dates_pl)*4)
+                    rows.append([aid,name,one,two,len(dates_pl),risk])
+            drill=pd.DataFrame(rows,columns=["Associate ID","Name","1-Day SL Count","2-Day SL Cluster Count","1-Day PL Count","Disruption Risk Index"])
+            if not drill.empty:
+                drill=drill.sort_values("Disruption Risk Index",ascending=False).head(15)
+                drill["Disruption Risk Index"]=drill["Disruption Risk Index"].map(lambda x:f"{int(x)}%")
+                st.dataframe(drill,hide_index=True,use_container_width=True)
+            else:
+                st.info("No repeated SL/PL pattern meets the review threshold in the selected source files.")
+        else:
+            st.info("High-frequency and 2-day cluster detection needs at least two dated DWD files containing Associate ID/Name and Attendance. The current workbook contains one dated roster, so the app intentionally does not manufacture historical patterns.")
+
+# ---------- Settings ----------
+if nav=="Settings":
+    st.markdown('<div class="card"><div class="card-title">Data Source Settings</div><p class="sub">The app reads only files stored in <b>AUH 1</b> whose names match <b>DWD-AUH1-DDMMYYYY.xlsx</b>.</p></div>',unsafe_allow_html=True)
+    st.markdown("### Loaded DWD files")
+    st.dataframe(pd.DataFrame([{"File":b["file"],"Date":b["date"],"Roster rows":len(b.get("roster",[]))} for b in bundle]),hide_index=True,use_container_width=True)
+    st.info("Add additional dated DWD files to AUH 1 and refresh the Streamlit app. Historical SL/PL clusters will then be calculated from actual dated records.")
+
+if nav=="Reports":
+    st.markdown('<div class="card"><div class="card-title">Source Audit</div><div class="sub">No synthetic records are used.</div></div>',unsafe_allow_html=True)
+    st.write(f"Loaded files: {len(bundle)}")
+    st.write(f"Records after filters: {len(h):,}")
+    st.write("Workbook sheets detected:", ", ".join(pd.ExcelFile(bundle[0]["file"] if False else DATA_DIR / bundle[0]["file"]).sheet_names))
