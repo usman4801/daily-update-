@@ -12,6 +12,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- SESSION STATE FOR KPI CLICKS ---
+if 'active_view' not in st.session_state:
+    st.session_state.active_view = None
+
+def toggle_view(view_name):
+    if st.session_state.active_view == view_name:
+        st.session_state.active_view = None  # Close if already open
+    else:
+        st.session_state.active_view = view_name # Open selected
+
 # ----------------- EXACT FIGMA CSS + INTERACTIVITY -----------------
 st.markdown("""
 <style>
@@ -41,9 +51,7 @@ st.markdown("""
         padding: 16px 12px !important;
     }
 
-    /* REAL STREAMLIT BUTTON STYLING (For Interactivity) */
-    
-    /* 1. Main Content Buttons (Action Links) */
+    /* STREAMLIT BUTTON STYLING */
     div.stButton > button {
         border: 1px solid #e2e8f0 !important;
         background-color: white !important;
@@ -71,105 +79,49 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(56, 189, 248, 0.1) !important;
     }
 
-    /* 2. Sidebar Buttons Styling */
-    section[data-testid="stSidebar"] div.stButton {
-        margin-bottom: -10px !important;
-    }
-    section[data-testid="stSidebar"] div.stButton > button {
-        background-color: transparent !important;
-        border: none !important;
-        color: #94a3b8 !important;
-        box-shadow: none !important;
-        font-weight: 500 !important;
-        padding: 6px 12px !important;
-        min-height: 34px !important;
-        border-radius: 8px !important;
-    }
-    section[data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: #1e293b !important;
-        color: #38bdf8 !important;
-    }
-    section[data-testid="stSidebar"] div.stButton > button:focus {
-        background-color: #1e293b !important;
-        color: #38bdf8 !important;
-        border: none !important;
-        outline: none !important;
-    }
-    /* Simulate Active Home Button */
-    section[data-testid="stSidebar"] div.stButton:first-of-type > button {
-        background-color: #1e293b !important;
-        color: #38bdf8 !important;
-        font-weight: 600 !important;
-    }
+    /* Sidebar Buttons */
+    section[data-testid="stSidebar"] div.stButton { margin-bottom: -10px !important; }
+    section[data-testid="stSidebar"] div.stButton > button { background-color: transparent !important; border: none !important; color: #94a3b8 !important; box-shadow: none !important; font-weight: 500 !important; padding: 6px 12px !important; min-height: 34px !important; border-radius: 8px !important; }
+    section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1e293b !important; color: #38bdf8 !important; }
+    section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
-    /* Widget Customization for Thin Date Picker & Selectbox */
-    div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label {
-        display: none !important;
-    }
-    div[data-testid="stDateInput"] div[data-baseweb="input"],
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] {
-        border-radius: 20px !important;
-        min-height: 36px !important;
-        height: 36px !important;
-        border: 1px solid #e2e8f0 !important;
-        background-color: white !important;
-    }
-    div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within,
-    div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
-        border-color: #38bdf8 !important;
-        box-shadow: 0 0 0 1px #38bdf8 !important;
-    }
-    div[data-testid="stDateInput"] input,
-    div[data-testid="stSelectbox"] div[class*="singleValue"] {
-        font-size: 12.5px !important;
-        color: #64748b !important;
-        padding-left: 10px !important;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-    }
-
-    /* Metric KPI Cards & Boxes */
-    .kpi-card {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 14px 16px;
-    }
+    /* Custom KPI Cards Layout */
+    .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 5px; }
     .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
     .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
     .kpi-growth { font-size: 11px; font-weight: 700; color: #16a34a; }
 
-    .content-box {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 14px 16px;
+    /* Specific Button style for KPI Actions */
+    .kpi-action-btn button {
+        background-color: #f8fafc !important; color: #3b82f6 !important; border-color: #e2e8f0 !important;
+        justify-content: center !important; font-size: 11px !important; min-height: 28px !important; padding: 4px !important;
     }
-    .box-header {
-        display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a;
-    }
+    .kpi-action-btn button:hover { background-color: #eff6ff !important; border-color: #93c5fd !important; }
 
+    .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
+    .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a; }
+
+    /* Custom inline dropdown */
+    .custom-dropdown { font-size: 11px; font-weight: 600; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 6px; border-radius: 6px; outline: none; cursor: pointer; font-family: inherit; }
+    .custom-dropdown:hover { border-color: #cbd5e1; color: #0f172a; }
+
+    /* Dataframe Container */
+    .stDataFrame { border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+    
     /* Table */
     .emp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .emp-table th { text-align: left; padding: 8px 10px; color: #64748b; font-size: 10.5px; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
     .emp-table td { padding: 9px 10px; border-bottom: 1px solid #f8fafc; color: #1e293b; }
     .risk-badge { padding: 2px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 700; }
     
-    [data-testid="stImage"] img {
-        border-radius: 14px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
-
-    /* Custom Clickable HTML Links */
-    .ai-insight-btn {
-        background: white; color: #2563eb; border-radius: 8px; padding: 10px 16px; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2; text-decoration: none; transition: transform 0.1s;
-    }
+    [data-testid="stImage"] img { border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .ai-insight-btn { background: white; color: #2563eb; border-radius: 8px; padding: 10px 16px; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2; text-decoration: none; transition: transform 0.1s; }
     .ai-insight-btn:hover { transform: scale(1.03); }
     .action-link:hover { cursor: pointer; text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- SIDEBAR (INTERACTIVE BUTTONS) -----------------
+# ----------------- SIDEBAR -----------------
 with st.sidebar:
     st.markdown("""
     <div style="display:flex; align-items:center; gap:8px; padding: 4px 0 24px 0;">
@@ -182,7 +134,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Make Navigation functional with Streamlit Buttons
     nav_items = ["🏠 Home", "📈 Attendance Insights", "🤒 Sick Leave Tracker", "👤 Employee Profiles", "🎯 Coaching & Guidance", "📄 Reports & Analytics", "👥 Team Overview", "⚙️ Settings"]
     for item in nav_items:
         if st.button(item, key=f"nav_{item}"):
@@ -280,10 +231,15 @@ def load_real_data(site, start_d, end_d):
 
 df = load_real_data(selected_site, start_date, end_date)
 
+# Variables for metrics & Dataframes for expanding details
 total_emp_count = 0
 total_sick = 0
 one_day_events = 0
 two_day_events = 0
+
+df_1_day = pd.DataFrame()
+df_2_day = pd.DataFrame()
+sick_df = pd.DataFrame()
 table_data = []
 chart_fig = go.Figure()
 
@@ -295,23 +251,37 @@ if not df.empty:
     total_sick = len(sick_df)
     
     if not sick_df.empty:
+        one_day_records = []
+        two_day_records = []
+        
+        # Calculate streaks
         sick_df = sick_df.sort_values(by=['EMP Name', 'Date'])
         for emp, group in sick_df.groupby('EMP Name'):
             dates = sorted(group['Date'].tolist())
-            if len(dates) == 1:
-                one_day_events += 1
-            else:
-                cons = 1
-                for i in range(1, len(dates)):
-                    if (dates[i] - dates[i-1]).days == 1:
-                        cons += 1
-                    else:
-                        if cons == 1: one_day_events += 1
-                        elif cons >= 2: two_day_events += 1
-                        cons = 1
-                if cons == 1: one_day_events += 1
-                elif cons >= 2: two_day_events += 1
-                
+            dept = group['Department'].iloc[0] if pd.notna(group['Department'].iloc[0]) else "Unknown"
+            
+            streaks = []
+            current_streak = [dates[0]]
+            for d in dates[1:]:
+                if (d - current_streak[-1]).days == 1:
+                    current_streak.append(d)
+                else:
+                    streaks.append(current_streak)
+                    current_streak = [d]
+            streaks.append(current_streak)
+            
+            for s in streaks:
+                if len(s) == 1:
+                    one_day_events += 1
+                    one_day_records.append({"EMP Name": emp, "Department": dept, "Leave Date": s[0].strftime('%Y-%m-%d'), "Type": "1-Day"})
+                else:
+                    two_day_events += 1
+                    two_day_records.append({"EMP Name": emp, "Department": dept, "Start Date": s[0].strftime('%Y-%m-%d'), "End Date": s[-1].strftime('%Y-%m-%d'), "Total Days": len(s), "Type": "Consecutive"})
+        
+        df_1_day = pd.DataFrame(one_day_records)
+        df_2_day = pd.DataFrame(two_day_records)
+        
+        # Risk Table
         sl_counts = sick_df.groupby(['EMP Name', 'Department']).agg(
             events=('Date', 'count'),
             last_date=('Date', 'max')
@@ -358,6 +328,7 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
+    # --- Clickable KPI Row ---
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -370,6 +341,10 @@ with col_main:
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">In selected period</div>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
+        st.button("👀 View List", key="btn_all", use_container_width=True, on_click=toggle_view, args=("Total Employees",))
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     with k2:
         st.markdown(f"""
         <div class="kpi-card">
@@ -381,6 +356,10 @@ with col_main:
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Total SL days</div>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
+        st.button("👀 View List", key="btn_sl", use_container_width=True, on_click=toggle_view, args=("Sick Leave",))
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     with k3:
         st.markdown(f"""
         <div class="kpi-card">
@@ -392,6 +371,10 @@ with col_main:
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Single day leaves</div>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
+        st.button("👀 View Details", key="btn_1day", use_container_width=True, on_click=toggle_view, args=("1-Day Events",))
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     with k4:
         st.markdown(f"""
         <div class="kpi-card">
@@ -403,16 +386,60 @@ with col_main:
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Consecutive leaves</div>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
+        st.button("👀 View Details", key="btn_2day", use_container_width=True, on_click=toggle_view, args=("2+ Day Events",))
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- DYNAMIC DATA VIEWER ---
+    if st.session_state.active_view:
+        st.markdown(f"""
+        <div style="background-color: #f8fafc; border: 1px solid #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h4 style="margin: 0; color: #0f172a; font-size: 15px;">🔍 Breakdown: {st.session_state.active_view}</h4>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.session_state.active_view == "Total Employees":
+            if not df.empty:
+                st.dataframe(df[['EMP Name', 'Department']].drop_duplicates().reset_index(drop=True), use_container_width=True, height=200)
+            else:
+                st.info("No data available for this range.")
+                
+        elif st.session_state.active_view == "Sick Leave":
+            if not sick_df.empty:
+                st.dataframe(sick_df[['EMP Name', 'Department', 'Date']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=200)
+            else:
+                st.info("No sick leave records found.")
+                
+        elif st.session_state.active_view == "1-Day Events":
+            if not df_1_day.empty:
+                st.dataframe(df_1_day, use_container_width=True, height=200)
+            else:
+                st.info("No 1-Day events found.")
+                
+        elif st.session_state.active_view == "2+ Day Events":
+            if not df_2_day.empty:
+                st.dataframe(df_2_day, use_container_width=True, height=200)
+            else:
+                st.info("No consecutive sick leave events found.")
+                
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
+    # --- Chart Area ---
     c_chart, c_insight = st.columns([6, 4])
     with c_chart:
         st.markdown(f"""
         <div class="content-box">
             <div class="box-header">
                 <span>📈 Sick Leave Pattern Analysis</span>
-                <span style="font-size:11px; font-weight:600; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; padding:2px 8px; border-radius:6px;">{selected_site} ▾</span>
+                <select class="custom-dropdown">
+                    <option>{selected_site} Data</option>
+                    <option>All Sites Data</option>
+                    <option>Last 3 Months Trend</option>
+                </select>
             </div>
         """, unsafe_allow_html=True)
         
@@ -444,6 +471,7 @@ with col_main:
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
+    # --- Top At-Risk Table ---
     rows_str = ""
     if table_data:
         for r in table_data:
@@ -453,7 +481,6 @@ with col_main:
             rows_str += f"<td style='text-align:center; font-weight:600;'>{r['events']}</td>"
             rows_str += f"<td style='color:#64748b;'>{r['date']}</td>"
             rows_str += f"<td><span class='risk-badge' style='background:{r['bg']}; color:{r['color']};'>{r['risk']}</span></td>"
-            # View is now an interactive link class
             rows_str += f"<td><a href='#' class='action-link' style='color:#2563eb; font-weight:700; text-decoration:none;'>View →</a></td></tr>"
     else:
         rows_str = "<tr><td colspan='7' style='text-align:center; color:#64748b; padding: 24px;'>✅ No sick leave patterns found for the selected date range.</td></tr>"
@@ -491,8 +518,8 @@ with col_main:
     </div>
     """, unsafe_allow_html=True)
 
+# ----------------- SIDEBAR METRICS -----------------
 with col_side:
-    # 1. AI Assistant Card - FIXED ROBOT ALIGNMENT (right: 15px, width: 80px) & CLICKABLE BUTTON
     st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
 <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
 <span style="font-size:14px;">🤖</span> AI ASSISTANT
@@ -502,10 +529,9 @@ with col_side:
 <div style="font-size:13px; line-height:1.5; opacity:0.95; width:65%; margin-bottom:20px; position: relative; z-index: 2;">
 Hi PXT! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
 </div>
-<a href="#" class="ai-insight-btn" onclick="alert('Generating Deep AI Insights...');">View Insights →</a>
+<a href="#" class="ai-insight-btn" onclick="alert('Analyzing AI Trends...');">View Insights →</a>
 </div>""", unsafe_allow_html=True)
 
-    # 2. Interactive Action Links Using Streamlit Buttons!
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px; padding: 10px 14px;">
         <div style="font-weight: 700; font-size: 12.5px; color: #0f172a; margin-bottom: 8px;">⚡ Quick Actions</div>
@@ -516,7 +542,7 @@ Hi PXT! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b
     if st.button("📝 Generate Coaching File", use_container_width=True):
         st.success("✅ Coaching template created successfully!")
     if st.button("📊 View Raw Roster", use_container_width=True):
-        st.info("ℹ️ Opening Raw Roster Data in new tab...")
+        st.info("ℹ️ Opening Raw Roster Data...")
         
     st.markdown("</div>", unsafe_allow_html=True)
 
