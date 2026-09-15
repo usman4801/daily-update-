@@ -5,7 +5,7 @@ import glob
 import os
 
 st.set_page_config(
-    page_title="Amazon - People Analytics",
+    page_title="Amazon People Analytics",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -18,58 +18,34 @@ def load_data():
         files = sorted(glob.glob("*.xlsx"), reverse=True)
     
     emp_count = 1248
-    roster_records = []
-    
     if files:
         try:
-            filepath = files[0]
-            xls = pd.ExcelFile(filepath)
+            xls = pd.ExcelFile(files[0])
             if 'Roster' in xls.sheet_names:
-                df_raw = pd.read_excel(filepath, sheet_name='Roster')
-                header_idx = None
-                for i, row in df_raw.head(10).iterrows():
-                    if 'S.No' in row.values or 'AMZ ID' in row.values:
-                        header_idx = i
+                df = pd.read_excel(files[0], sheet_name='Roster')
+                for i, r in df.head(10).iterrows():
+                    if 'S.No' in r.values or 'AMZ ID' in r.values:
+                        df = pd.read_excel(files[0], sheet_name='Roster', skiprows=i+1)
                         break
-                if header_idx is not None:
-                    df_clean = pd.read_excel(filepath, sheet_name='Roster', skiprows=header_idx + 1)
-                else:
-                    df_clean = pd.read_excel(filepath, sheet_name='Roster')
-                
-                valid = df_clean.dropna(subset=['EMP Name'])
+                valid = df.dropna(subset=['EMP Name'])
                 if len(valid) > 0:
                     emp_count = len(valid)
-                
-                for _, r in valid.head(5).iterrows():
-                    roster_records.append({
-                        "name": str(r.get('EMP Name', '')).title(),
-                        "dept": str(r.get('Department', 'Operations')),
-                    })
         except Exception:
             pass
             
-    if not roster_records or len(roster_records) < 5:
-        roster_records = [
-            {"name": "Emma Wilson", "dept": "Operations"},
-            {"name": "James Carter", "dept": "Logistics"},
-            {"name": "Olivia Davis", "dept": "Customer Service"},
-            {"name": "Liam Brown", "dept": "Finance"},
-            {"name": "Sophia Martinez", "dept": "Marketing"}
-        ]
-        
-    return emp_count, roster_records
+    return emp_count
 
-total_emp_count, emp_list = load_data()
+total_emp_count = load_data()
 
-table_rows = [
-    {"name": emp_list[0]['name'], "dept": emp_list[0]['dept'], "pattern": "4 × 1 day (last 3 months)", "events": 4, "date": "Jun 12, 2026", "risk": "Medium", "color": "#b45309", "bg": "#fef3c7"},
-    {"name": emp_list[1]['name'], "dept": emp_list[1]['dept'], "pattern": "3 × 2 days (last 3 months)", "events": 3, "date": "Jun 10, 2026", "risk": "Medium", "color": "#b45309", "bg": "#fef3c7"},
-    {"name": emp_list[2]['name'], "dept": emp_list[2]['dept'], "pattern": "5 × 1 day (3 months)", "events": 5, "date": "Jun 08, 2026", "risk": "High", "color": "#b91c1c", "bg": "#fee2e2"},
-    {"name": emp_list[3]['name'], "dept": emp_list[3]['dept'], "pattern": "2 × 2 days (last 2 months)", "events": 2, "date": "Jun 05, 2026", "risk": "Low", "color": "#047857", "bg": "#d1fae5"},
-    {"name": emp_list[4]['name'], "dept": emp_list[4]['dept'], "pattern": "6 × 1 day (increasing trend)", "events": 6, "date": "Jun 02, 2026", "risk": "High", "color": "#b91c1c", "bg": "#fee2e2"},
+table_data = [
+    {"name": "Emma Wilson", "dept": "Operations", "pattern": "4 × 1 day (last 3 months)", "events": 4, "date": "Jun 12, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
+    {"name": "James Carter", "dept": "Logistics", "pattern": "3 × 2 days (last 3 months)", "events": 3, "date": "Jun 10, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
+    {"name": "Olivia Davis", "dept": "Customer Service", "pattern": "5 × 1 day (3 months)", "events": 5, "date": "Jun 08, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
+    {"name": "Liam Brown", "dept": "Finance", "pattern": "2 × 2 days (last 2 months)", "events": 2, "date": "Jun 05, 2026", "risk": "Low", "color": "#059669", "bg": "#d1fae5"},
+    {"name": "Sophia Martinez", "dept": "Marketing", "pattern": "6 × 1 day (increasing trend)", "events": 6, "date": "Jun 02, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
 ]
 
-# ----------------- EXACT FIGMA REPLICA CSS -----------------
+# ----------------- EXACT FIGMA CSS -----------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -78,24 +54,24 @@ st.markdown("""
         font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
     .stApp {
-        background-color: #f0f4f9 !important;
+        background-color: #f3f6fb !important;
     }
     .block-container {
-        padding: 1rem 1.6rem !important;
+        padding: 0.8rem 1.6rem !important;
         max-width: 100% !important;
     }
     header[data-testid="stHeader"], [data-testid="stToolbar"] {
         display: none !important;
     }
 
-    /* Left Sidebar */
+    /* Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #0b1528 !important;
-        width: 230px !important;
-        min-width: 230px !important;
+        background-color: #0d172a !important;
+        width: 235px !important;
+        min-width: 235px !important;
     }
     section[data-testid="stSidebar"] .block-container {
-        padding: 18px 14px !important;
+        padding: 16px 12px !important;
     }
     
     .nav-item {
@@ -107,7 +83,8 @@ st.markdown("""
         border-radius: 8px;
         font-size: 13px;
         font-weight: 500;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
+        cursor: pointer;
     }
     .nav-item.active {
         background: #1e293b;
@@ -133,18 +110,17 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 10px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
 
-    /* Hero Banner with Building Illustration */
+    /* Hero Banner */
     .hero-container {
-        background: linear-gradient(105deg, #e0f2fe 0%, #eff6ff 48%, #e0f2fe 100%);
-        border-radius: 16px;
-        padding: 22px 26px;
+        background: linear-gradient(110deg, #e0f2fe 0%, #eff6ff 50%, #e0f2fe 100%);
+        border-radius: 14px;
+        padding: 20px 24px;
         border: 1px solid #bae6fd;
         position: relative;
         overflow: hidden;
-        margin-bottom: 16px;
+        margin-bottom: 14px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -152,50 +128,46 @@ st.markdown("""
     .hero-badge {
         background: #0284c7;
         color: white;
-        font-size: 10.5px;
-        font-weight: 700;
-        padding: 3px 10px;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 3px 9px;
         border-radius: 20px;
         display: inline-block;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     .hero-container h2 {
-        font-size: 23px;
+        font-size: 22px;
         font-weight: 800;
         color: #0f172a;
-        margin: 0 0 6px 0;
+        margin: 0 0 5px 0;
         line-height: 1.2;
     }
     .hero-container p {
-        font-size: 12.5px;
+        font-size: 12px;
         color: #475569;
-        margin: 0 0 16px 0;
+        margin: 0 0 14px 0;
         max-width: 580px;
-        line-height: 1.4;
     }
     .pill-btn {
         background: white;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #cbd5e1;
         border-radius: 8px;
-        padding: 7px 14px;
-        font-size: 12px;
+        padding: 6px 12px;
+        font-size: 11.5px;
         font-weight: 600;
         color: #1e293b;
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        margin-right: 8px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        gap: 6px;
+        margin-right: 6px;
     }
     
-    /* Graphic Building Box */
     .building-graphic {
-        position: relative;
-        width: 210px;
-        height: 125px;
-        border-radius: 12px;
+        width: 200px;
+        height: 115px;
+        border-radius: 10px;
         overflow: hidden;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.08);
         border: 2px solid white;
         flex-shrink: 0;
     }
@@ -206,33 +178,27 @@ st.markdown("""
     }
     .quote-tag {
         position: absolute;
-        top: -12px;
-        right: 15px;
-        background: white;
-        padding: 6px 12px;
-        border-radius: 20px;
+        top: 10px;
+        right: 18px;
         font-size: 11px;
         font-weight: 700;
         color: #1e293b;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-        border: 1px solid #e2e8f0;
     }
 
-    /* Metric Cards */
+    /* Metric KPI Cards */
     .kpi-card {
         background: white;
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        border-radius: 12px;
+        padding: 14px 16px;
     }
     .kpi-title {
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 600;
         color: #64748b;
     }
     .kpi-val {
-        font-size: 26px;
+        font-size: 24px;
         font-weight: 800;
         color: #0f172a;
         margin-top: 4px;
@@ -241,50 +207,29 @@ st.markdown("""
         gap: 6px;
     }
     .kpi-growth {
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 700;
         color: #16a34a;
     }
 
-    /* Container Box */
+    /* Box Containers */
     .content-box {
         background: white;
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        border-radius: 12px;
+        padding: 14px 16px;
     }
     .box-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
-        font-size: 13.5px;
+        margin-bottom: 10px;
+        font-size: 13px;
         font-weight: 700;
         color: #0f172a;
     }
 
-    /* Assistant Card with 3D Robot Mascot */
-    .ai-assistant-wrapper {
-        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-        border-radius: 16px;
-        padding: 18px 18px 16px 18px;
-        color: white;
-        margin-bottom: 14px;
-        position: relative;
-        overflow: hidden;
-    }
-    .robot-mascot {
-        position: absolute;
-        right: 8px;
-        bottom: 8px;
-        width: 82px;
-        height: 82px;
-        background-size: contain;
-        background-repeat: no-repeat;
-    }
-
-    /* Employee Data Table */
+    /* Table */
     .emp-table {
         width: 100%;
         border-collapse: collapse;
@@ -292,19 +237,19 @@ st.markdown("""
     }
     .emp-table th {
         text-align: left;
-        padding: 10px;
+        padding: 8px 10px;
         color: #64748b;
-        font-size: 11px;
-        font-weight: 600;
+        font-size: 10.5px;
         border-bottom: 1px solid #e2e8f0;
+        font-weight: 600;
     }
     .emp-table td {
-        padding: 10px;
+        padding: 9px 10px;
         border-bottom: 1px solid #f8fafc;
         color: #1e293b;
     }
     .risk-badge {
-        padding: 3px 8px;
+        padding: 2px 7px;
         border-radius: 6px;
         font-size: 10.5px;
         font-weight: 700;
@@ -314,7 +259,6 @@ st.markdown("""
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
-    # Amazon Original Logo SVG
     st.markdown("""
     <div style="display:flex; align-items:center; gap:8px; padding: 4px 0 24px 0;">
         <svg width="95" height="30" viewBox="0 0 100 32" fill="white">
@@ -333,7 +277,7 @@ with st.sidebar:
     <div class="nav-item">👥 Team Overview</div>
     <div class="nav-item">⚙️ Settings</div>
     
-    <div style="background: radial-gradient(100% 100% at 50% 0%, #1e3a8a 0%, #0c162c 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-top: 36px; color: white;">
+    <div style="background: radial-gradient(100% 100% at 50% 0%, #1e3a8a 0%, #0d172a 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-top: 36px; color: white;">
         <div style="font-weight: 800; font-size: 11px;">Healthy Teams Build a Stronger Tomorrow</div>
         <div style="font-size: 10px; color: #93c5fd; margin-top: 5px; line-height: 1.3;">Better insights. Better conversations. A healthier workplace.</div>
         <div style="font-size: 18px; margin-top: 8px; color: #f59e0b;">⌣</div>
@@ -347,14 +291,14 @@ st.markdown("""
         <span>🔍</span> Search by employee, department, or team...
     </div>
     <div style="display:flex; align-items:center; gap:18px;">
-        <span style="font-size:12px; color:#64748b; font-weight:700; cursor:pointer;">⚡ Filters</span>
+        <span style="font-size:12px; color:#64748b; font-weight:700;">⚡ Filters</span>
         <span style="font-size:16px;">🔔</span>
         <div style="display:flex; align-items:center; gap:10px;">
             <div style="text-align:right;">
                 <div style="font-size:12px; font-weight:800; color:#0f172a;">Sarah Johnson</div>
                 <div style="font-size:10px; color:#64748b;">HR Manager</div>
             </div>
-            <div style="width:34px; height:34px; border-radius:50%; background:#fcd34d; display:flex; align-items:center; justify-content:center; font-size:16px; border:2px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.1);">👩‍💼</div>
+            <div style="width:34px; height:34px; border-radius:50%; background:#fed7aa; display:flex; align-items:center; justify-content:center; font-size:16px;">👩‍💼</div>
         </div>
     </div>
 </div>
@@ -364,7 +308,7 @@ st.markdown("""
 col_main, col_side = st.columns([7.4, 2.6])
 
 with col_main:
-    # 1. Hero Banner with Building Image
+    # 1. Hero Banner
     st.markdown("""
     <div class="hero-container">
         <div>
@@ -378,10 +322,10 @@ with col_main:
                 <span class="pill-btn"><span style="color:#059669;">🌱</span> Build Healthier Teams</span>
             </div>
         </div>
-        <div style="position:relative;">
+        <div>
             <div class="quote-tag">Healthier people build brighter futures ↗</div>
             <div class="building-graphic">
-                <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80" alt="Amazon Building">
+                <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80" alt="Building">
             </div>
         </div>
     </div>
@@ -497,7 +441,7 @@ with col_main:
         f"<td style='color:#64748b;'>{r['date']}</td>"
         f"<td><span class='risk-badge' style='background:{r['bg']}; color:{r['color']};'>{r['risk']}</span></td>"
         f"<td><span style='color:#2563eb; font-weight:700; cursor:pointer;'>View →</span></td></tr>"
-        for r in table_rows
+        for r in table_data
     ])
     
     st.markdown(f"""
@@ -524,7 +468,7 @@ with col_main:
 
     # Bottom Gradient Action Strip
     st.markdown("""
-    <div style="background: linear-gradient(90deg, #0284c7, #2563eb); border-radius: 12px; padding: 10px 18px; margin-top: 14px; display: flex; justify-content: space-between; align-items: center; color: white; font-size: 12px; font-weight: 600;">
+    <div style="background: linear-gradient(90deg, #0284c7, #2563eb); border-radius: 10px; padding: 9px 16px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; color: white; font-size: 11.5px; font-weight: 600;">
         <span>From attendance data to meaningful actions</span>
         <div style="display:flex; gap:12px;">
             <span>🔍 Spot patterns</span>
@@ -535,22 +479,22 @@ with col_main:
     """, unsafe_allow_html=True)
 
 with col_side:
-    # 1. AI Assistant Card with Mascot Robot
+    # 1. AI Assistant Card
     st.markdown("""
-    <div class="ai-assistant-wrapper">
+    <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 14px; padding: 16px; color: white; margin-bottom: 12px; position: relative;">
         <div style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">🤖 AI Assistant</div>
         <div style="font-weight:800; font-size:14px; margin: 2px 0 6px 0;">Always here to help</div>
-        <div style="font-size:11.5px; line-height:1.4; opacity:0.95; width:70%; margin-bottom:12px;">
+        <div style="font-size:11px; line-height:1.4; opacity:0.95; width:70%; margin-bottom:12px;">
             Hi Sarah! 👋<br>I've found <b>3 employees</b> with recurring 1-day and 2-day sick leave patterns in the last 6 months.
         </div>
-        <div style="background:white; color:#1d4ed8; border-radius:8px; padding:7px; text-align:center; font-weight:700; font-size:11.5px; width:65%; cursor:pointer;">
+        <div style="background:white; color:#1d4ed8; border-radius:8px; padding:6px; text-align:center; font-weight:700; font-size:11px; width:65%; cursor:pointer;">
             View Insights →
         </div>
-        <div class="robot-mascot" style="background-image: url('https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png');"></div>
+        <div style="position:absolute; right:8px; bottom:8px; font-size:55px;">🤖</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. Quick Action Links
+    # 2. Action Links
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px; padding: 10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid #f8fafc;">
@@ -597,7 +541,7 @@ with col_side:
 
     # 4. Recent Coaching Activity
     st.markdown("""
-    <div class="content-box">
+    <div class="content-box" style="margin-bottom: 12px;">
         <div class="box-header">
             <span>⚡ Recent Coaching</span>
             <span style="font-size:10px; color:#2563eb; cursor:pointer;">View All &gt;</span>
@@ -614,5 +558,15 @@ with col_side:
             <div><b>Olivia Davis</b><br><span style="font-size:9.5px; color:#94a3b8;">In Progress • Jun 6</span></div>
             <span class="risk-badge" style="background:#fef3c7; color:#b45309;">1-Day Pattern</span>
         </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 5. Quote Card at Bottom Right
+    st.markdown("""
+    <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
+        <div style="font-size:10.5px; color:#166534; font-weight:600; line-height:1.3;">
+            “The best leaders don't just manage, they support people.”
+        </div>
+        <span style="color:#dc2626; font-size:14px; margin-left:8px;">🤍</span>
     </div>
     """, unsafe_allow_html=True)
