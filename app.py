@@ -193,7 +193,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- TOP BAR (Site First, Date Range Second) -----------------
+# ----------------- TOP BAR -----------------
 top_col1, top_col2, top_col3 = st.columns([1.2, 2.3, 5.0])
 
 with top_col1:
@@ -203,16 +203,18 @@ with top_col2:
     default_end = datetime.date(2026, 9, 4)
     selected_dates = st.date_input("Date Range", value=(default_start, default_end), label_visibility="collapsed")
 with top_col3:
+    # Updated user profile section (Removed HR Manager, changed to javmuhak, added Amazon icon)
     st.markdown("""
     <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 2px;">
         <span style="font-size:12px; color:#64748b; font-weight:700;">⚡ Filters</span>
         <span style="font-size:16px;">🔔</span>
         <div style="display:flex; align-items:center; gap:10px;">
             <div style="text-align:right;">
-                <div style="font-size:12px; font-weight:800; color:#0f172a;">Sarah Johnson</div>
-                <div style="font-size:10px; color:#64748b;">HR Manager</div>
+                <div style="font-size:13.5px; font-weight:800; color:#0f172a; margin-top: 1px;">javmuhak</div>
             </div>
-            <div style="width:34px; height:34px; border-radius:50%; background:#fed7aa; display:flex; align-items:center; justify-content:center; font-size:16px;">👩‍💼</div>
+            <div style="width:34px; height:34px; border-radius:50%; background:#ffffff; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow: hidden;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png" style="width: 18px;">
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -254,7 +256,7 @@ def load_real_data(site, start_d, end_d):
             if 'Roster' in xls.sheet_names:
                 df = pd.read_excel(f, sheet_name='Roster')
                 
-                # Dynamic Header Finding (S.No, EMP Name ya AMZ ID)
+                # Dynamic Header Finding
                 header_idx = 0
                 for i, row in df.head(15).iterrows():
                     row_strs = [str(val).strip() for val in row.values]
@@ -503,7 +505,7 @@ with col_main:
 
 
 with col_side:
-    # 1. AI Assistant Card
+    # 1. AI Assistant Card (Updated Name to javmuhak)
     st.markdown(f"""
     <div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
         <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
@@ -511,7 +513,7 @@ with col_side:
         </div>
         <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0;">Data Synced!</div>
         <div style="font-size:13px; line-height:1.5; opacity:0.95; width:70%; margin-bottom:20px;">
-            Hi Sarah! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
+            Hi javmuhak! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
         </div>
         <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
             View Insights →
