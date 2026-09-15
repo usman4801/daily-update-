@@ -77,41 +77,34 @@ st.markdown("""
 
 
     /* =====================================================================
-       MAGIC CSS: "VIEW" BUTTON PERFECTLY INSIDE THE KPI CARD! 
+       KPI CARD + ATTACHED "VIEW" FOOTER (no overlap, no clipping)
        ===================================================================== */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
-        border-radius: 12px; 
-        padding: 14px 16px; 
-        height: 95px; /* Clean height without grey text */
-        margin-bottom: 0px; 
+        border-bottom: none;
+        border-radius: 12px 12px 0 0; 
+        padding: 14px 16px 10px 16px; 
         transition: all 0.2s ease;
     }
     .kpi-card:hover {
         border-color: #38bdf8;
-        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
     }
 
-    /* Make the column a positioning context so the "View" button can anchor to the card */
-    div[data-testid="column"]:has(.kpi-btn-wrapper) {
-        position: relative !important;
-    }
-    /* Target the button immediately following our kpi-btn-wrapper */
+    /* Pull the button's element-container up by 1px so it visually joins the card (removes double border) */
     div.element-container:has(.kpi-btn-wrapper) + div.element-container {
-        position: absolute !important;
-        bottom: 12px !important;
-        right: 14px !important;
-        top: auto !important;
-        left: auto !important;
-        margin: 0 !important;
-        width: auto !important;
-        height: auto !important;
-        z-index: 10 !important;
+        margin-top: -1px !important;
+        margin-bottom: 15px !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton {
-        display: block !important;
-        width: auto !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        width: 100% !important;
+        background: white !important;
+        border: 1px solid #e2e8f0 !important;
+        border-top: 1px dashed #eef2f7 !important;
+        border-radius: 0 0 12px 12px !important;
+        padding: 6px 12px !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button {
         background-color: #f0f9ff !important;
