@@ -77,14 +77,14 @@ st.markdown("""
 
 
     /* =====================================================================
-       KPI CARD + ATTACHED "VIEW" FOOTER (no overlap, no clipping)
+       KPI CARD + SEAMLESS "VIEW" AREA (looks like one tile, no overlap)
        ===================================================================== */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
         border-bottom: none;
         border-radius: 12px 12px 0 0; 
-        padding: 14px 16px 10px 16px; 
+        padding: 14px 16px 2px 16px; 
         transition: all 0.2s ease;
     }
     .kpi-card:hover {
@@ -102,9 +102,9 @@ st.markdown("""
         width: 100% !important;
         background: white !important;
         border: 1px solid #e2e8f0 !important;
-        border-top: 1px dashed #eef2f7 !important;
+        border-top: none !important;
         border-radius: 0 0 12px 12px !important;
-        padding: 6px 12px !important;
+        padding: 0 12px 10px 12px !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button {
         background-color: #f0f9ff !important;
