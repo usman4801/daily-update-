@@ -51,8 +51,8 @@ st.markdown("""
         padding: 16px 12px !important;
     }
 
-    /* Normal Streamlit Buttons (Like Quick Actions) */
-    div[data-testid="column"] div.stButton > button {
+    /* Normal Buttons (Like Quick Actions in Sidebar) */
+    div.stButton > button {
         border: 1px solid #e2e8f0 !important;
         background-color: white !important;
         color: #1e293b !important;
@@ -64,59 +64,67 @@ st.markdown("""
         transition: all 0.2s ease-in-out !important;
         width: 100% !important;
     }
-    div[data-testid="column"] div.stButton > button:hover {
+    div.stButton > button:hover {
         border-color: #38bdf8 !important;
         background-color: #f0f9ff !important;
+        color: #0284c7 !important;
     }
 
-    /* Sidebar Buttons */
+    /* Sidebar Buttons (Nav items) */
     section[data-testid="stSidebar"] div.stButton { margin-bottom: -10px !important; }
     section[data-testid="stSidebar"] div.stButton > button { background-color: transparent !important; border: none !important; color: #94a3b8 !important; box-shadow: none !important; font-weight: 500 !important; padding: 6px 12px !important; min-height: 34px !important; border-radius: 8px !important; }
     section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1e293b !important; color: #38bdf8 !important; }
     section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
-
     /* =====================================================================
-       THE MAGIC CSS: INVISIBLE OVERLAYS TO MAKE WHOLE KPI TILE CLICKABLE! 
+       MAGIC CSS: "VIEW" BUTTON PERFECTLY INSIDE THE KPI CARD! 
        ===================================================================== */
-    div.element-container:has(.kpi-card) + div.element-container {
-        margin-top: -115px !important; /* Pull button exactly over the tile */
-        position: relative !important;
+    /* Target ONLY the buttons inside the 4 Top KPI Columns */
+    div[data-testid="column"] div[data-testid="column"] div.stButton > button {
+        background-color: #f0f9ff !important;
+        color: #38bdf8 !important;
+        border: 1px solid #e0f2fe !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        padding: 2px 10px !important;
+        border-radius: 12px !important;
+        min-height: 24px !important;
+        height: 24px !important;
+        width: fit-content !important;
+        margin-left: auto !important; /* Push button to right side */
+        margin-right: 15px !important;
+        margin-top: -38px !important; /* PULL IT UP INSIDE THE CARD */
         z-index: 10 !important;
+        box-shadow: none !important;
     }
-    div.element-container:has(.kpi-card) + div.element-container div.stButton > button {
-        opacity: 0 !important; /* Make button completely invisible */
-        height: 115px !important; /* Match tile height */
-        width: 100% !important;
-        cursor: pointer !important;
-        padding: 0 !important;
-        margin: 0 !important;
+    div[data-testid="column"] div[data-testid="column"] div.stButton > button:hover {
+        background-color: #38bdf8 !important;
+        color: white !important;
     }
-    
+    /* Remove default Streamlit extra spacing below buttons */
+    div[data-testid="column"] div[data-testid="column"] div.stButton {
+        margin-bottom: 0px !important;
+        padding-bottom: 0px !important;
+    }
+    /* ===================================================================== */
+
+    /* KPI Cards Styling */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
         border-radius: 12px; 
         padding: 14px 16px; 
-        height: 115px; /* Fixed height for exact overlay */
+        margin-bottom: 0px; 
         transition: all 0.2s ease;
-        margin-bottom: 0px;
     }
-    
-    /* Hover effect for the tile when the invisible button above it is hovered */
-    div.element-container:has(.kpi-card):hover .kpi-card,
-    div.element-container:has(.kpi-card) + div.element-container:hover {
-        border-color: #38bdf8 !important;
-        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15) !important;
-        transform: translateY(-2px) !important;
+    .kpi-card:hover {
+        border-color: #38bdf8;
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
     }
-    /* ===================================================================== */
-
-
-    /* Other UI Elements */
     .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
     .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
 
+    /* General Containers */
     .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
     .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a; }
 
@@ -124,6 +132,7 @@ st.markdown("""
     .custom-dropdown:hover { border-color: #cbd5e1; color: #0f172a; }
 
     .stDataFrame { border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+    
     .emp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .emp-table th { text-align: left; padding: 8px 10px; color: #64748b; font-size: 10.5px; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
     .emp-table td { padding: 9px 10px; border-bottom: 1px solid #f8fafc; color: #1e293b; }
@@ -133,6 +142,10 @@ st.markdown("""
     .ai-insight-btn { background: white; color: #2563eb; border-radius: 8px; padding: 10px 16px; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2; text-decoration: none; transition: transform 0.1s; }
     .ai-insight-btn:hover { transform: scale(1.03); }
     .action-link:hover { cursor: pointer; text-decoration: underline; }
+
+    /* Fix Datepicker layout */
+    div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label { display: none !important; }
+    div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"] { border-radius: 20px !important; min-height: 36px !important; height: 36px !important; border: 1px solid #e2e8f0 !important; background-color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,7 +214,6 @@ else:
 def load_real_data(site, start_d, end_d):
     all_files = sorted(glob.glob(f"*{site}*.xlsx"), reverse=True)
     valid_files = []
-    
     for f in all_files:
         match = re.search(r'(\d{8})', f)
         if match:
@@ -212,7 +224,6 @@ def load_real_data(site, start_d, end_d):
                     valid_files.append((file_date, f))
             except ValueError:
                 pass
-                
     if not valid_files:
         return pd.DataFrame()
         
@@ -222,31 +233,26 @@ def load_real_data(site, start_d, end_d):
             xls = pd.ExcelFile(f)
             if 'Roster' in xls.sheet_names:
                 df = pd.read_excel(f, sheet_name='Roster')
-                
                 header_idx = 0
                 for i, row in df.head(15).iterrows():
                     row_strs = [str(val).strip() for val in row.values]
                     if 'EMP Name' in row_strs or 'AMZ ID' in row_strs or 'S.No' in row_strs:
                         header_idx = i
                         break
-                
                 df = pd.read_excel(f, sheet_name='Roster', skiprows=header_idx+1)
                 df.columns = df.columns.astype(str).str.strip() 
-                
                 if 'EMP Name' in df.columns and 'Attendance' in df.columns:
                     temp_df = df[['EMP Name', 'Department', 'Attendance']].copy()
                     temp_df['Date'] = f_date
                     dfs.append(temp_df)
         except Exception:
             pass
-            
     if dfs:
         return pd.concat(dfs, ignore_index=True)
     return pd.DataFrame()
 
 df = load_real_data(selected_site, start_date, end_date)
 
-# Variables for metrics & Dataframes for expanding details
 total_emp_count = 0
 total_sick = 0
 one_day_events = 0
@@ -259,22 +265,17 @@ table_data = []
 chart_fig = go.Figure()
 
 if not df.empty:
-    latest_date = df['Date'].max()
     total_emp_count = df['EMP Name'].nunique()
-    
     sick_df = df[df['Attendance'].astype(str).str.upper() == 'SL'].copy()
     total_sick = len(sick_df)
     
     if not sick_df.empty:
         one_day_records = []
         two_day_records = []
-        
-        # Calculate streaks
         sick_df = sick_df.sort_values(by=['EMP Name', 'Date'])
         for emp, group in sick_df.groupby('EMP Name'):
             dates = sorted(group['Date'].tolist())
             dept = group['Department'].iloc[0] if pd.notna(group['Department'].iloc[0]) else "Unknown"
-            
             streaks = []
             current_streak = [dates[0]]
             for d in dates[1:]:
@@ -284,7 +285,6 @@ if not df.empty:
                     streaks.append(current_streak)
                     current_streak = [d]
             streaks.append(current_streak)
-            
             for s in streaks:
                 if len(s) == 1:
                     one_day_events += 1
@@ -296,10 +296,8 @@ if not df.empty:
         df_1_day = pd.DataFrame(one_day_records)
         df_2_day = pd.DataFrame(two_day_records)
         
-        # Risk Table
         sl_counts = sick_df.groupby(['EMP Name', 'Department']).agg(
-            events=('Date', 'count'),
-            last_date=('Date', 'max')
+            events=('Date', 'count'), last_date=('Date', 'max')
         ).reset_index().sort_values(by='events', ascending=False).head(5)
         
         for _, row in sl_counts.iterrows():
@@ -307,30 +305,22 @@ if not df.empty:
             risk = "High" if events >= 3 else ("Medium" if events == 2 else "Low")
             bg = "#fee2e2" if risk == "High" else ("#fef3c7" if risk == "Medium" else "#d1fae5")
             color = "#dc2626" if risk == "High" else ("#d97706" if risk == "Medium" else "#059669")
-            
             table_data.append({
-                "name": row['EMP Name'],
-                "dept": row['Department'] if pd.notna(row['Department']) else "Unknown",
-                "pattern": f"{events} sick day(s)",
-                "events": events,
-                "date": row['last_date'].strftime("%b %d, %Y"),
-                "risk": risk,
-                "color": color,
-                "bg": bg
+                "name": row['EMP Name'], "dept": row['Department'] if pd.notna(row['Department']) else "Unknown",
+                "pattern": f"{events} sick day(s)", "events": events,
+                "date": row['last_date'].strftime("%b %d, %Y"), "risk": risk, "color": color, "bg": bg
             })
             
         daily_sick = sick_df.groupby('Date').size().reset_index(name='count')
         chart_fig.add_trace(go.Scatter(
-            x=daily_sick['Date'], y=daily_sick['count'], 
-            mode='lines+markers', name='Daily Sick Leave', 
+            x=daily_sick['Date'], y=daily_sick['count'], mode='lines+markers', name='Daily Sick Leave', 
             line=dict(color='#2563eb', width=2.5), marker=dict(size=6)
         ))
 
 chart_fig.update_layout(
     height=200, margin=dict(l=25, r=10, t=10, b=20),
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-    xaxis=dict(showgrid=False, linecolor='#e2e8f0'),
-    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', rangemode='tozero')
+    xaxis=dict(showgrid=False, linecolor='#e2e8f0'), yaxis=dict(showgrid=True, gridcolor='#f1f5f9', rangemode='tozero')
 )
 
 # ----------------- MAIN LAYOUT -----------------
@@ -343,7 +333,7 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # --- Clickable KPI Row (Buttons are fully hidden and overlayed exactly over tiles) ---
+    # --- KPI Row with PERFECTLY INTEGRATED BUTTONS ---
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -353,14 +343,12 @@ with col_main:
                 <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
             </div>
             <div class="kpi-val">{total_emp_count:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                <span style="font-size:10px; color:#94a3b8;">In selected period</span>
-                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">In selected period</div>
+            <div style="height: 12px;"></div> <!-- Empty space for button -->
         </div>
         """, unsafe_allow_html=True)
-        # Invisible overlay button
-        st.button("T", key="btn_all", on_click=toggle_view, args=("Total Employees",))
+        # Real Streamlit button, perfectly styled inside the card
+        st.button("👀 View", key="btn_all", on_click=toggle_view, args=("Total Employees",))
         
     with k2:
         st.markdown(f"""
@@ -370,13 +358,11 @@ with col_main:
                 <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
             </div>
             <div class="kpi-val">{total_sick:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                <span style="font-size:10px; color:#94a3b8;">Total SL days</span>
-                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Total SL days</div>
+            <div style="height: 12px;"></div>
         </div>
         """, unsafe_allow_html=True)
-        st.button("S", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
+        st.button("👀 View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
         
     with k3:
         st.markdown(f"""
@@ -386,13 +372,11 @@ with col_main:
                 <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
             </div>
             <div class="kpi-val">{one_day_events:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                <span style="font-size:10px; color:#94a3b8;">Single day leaves</span>
-                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Single day leaves</div>
+            <div style="height: 12px;"></div>
         </div>
         """, unsafe_allow_html=True)
-        st.button("1", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
+        st.button("👀 View", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
         
     with k4:
         st.markdown(f"""
@@ -402,13 +386,11 @@ with col_main:
                 <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
             </div>
             <div class="kpi-val">{two_day_events:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                <span style="font-size:10px; color:#94a3b8;">Consecutive leaves</span>
-                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Consecutive leaves</div>
+            <div style="height: 12px;"></div>
         </div>
         """, unsafe_allow_html=True)
-        st.button("2", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
+        st.button("👀 View", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
 
     # --- DYNAMIC DATA VIEWER ---
     if st.session_state.active_view:
