@@ -53,32 +53,39 @@ st.markdown("""
     }
 
     /* Sidebar Navigation Buttons */
-    section[data-testid="stSidebar"] div.stButton { margin-bottom: 4px !important; }
-    section[data-testid="stSidebar"] div.stButton > button {
+    section[data-testid="stSidebar"] div.stButton { margin-bottom: 3px !important; }
+    section[data-testid="stSidebar"] div.stButton > button,
+    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] {
         background-color: transparent !important;
-        border: none !important;
-        border-left: 3px solid transparent !important;
-        color: #8b98ac !important;
+        border: 1px solid transparent !important;
+        color: #8b95a8 !important;
         box-shadow: none !important;
+        outline: none !important;
         font-weight: 600 !important;
         font-size: 13.5px !important;
         padding: 10px 14px !important;
         min-height: 40px !important;
         border-radius: 8px !important;
         text-align: left !important;
-        transition: all 0.15s ease !important;
+        transition: background-color 0.15s ease, color 0.15s ease !important;
+    }
+    section[data-testid="stSidebar"] div.stButton > button:hover,
+    section[data-testid="stSidebar"] div.stButton > button:focus,
+    section[data-testid="stSidebar"] div.stButton > button:active,
+    section[data-testid="stSidebar"] div.stButton > button:focus:not(:active) {
+        border: 1px solid transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
     }
     section[data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: rgba(255,153,0,0.08) !important;
-        border-left: 3px solid #FF9900 !important;
+        background-color: rgba(148,163,184,0.10) !important;
         color: #ffffff !important;
-        transform: translateX(2px);
     }
     section[data-testid="stSidebar"] div.stButton:first-of-type > button {
-        background-color: rgba(255,153,0,0.14) !important;
-        border-left: 3px solid #FF9900 !important;
+        background: linear-gradient(90deg, rgba(37,99,235,0.22), rgba(37,99,235,0.06)) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
+        box-shadow: inset 3px 0 0 0 #3b82f6 !important;
     }
     section[data-testid="stSidebar"] .nav-label {
         font-size: 10px;
@@ -207,8 +214,8 @@ with st.sidebar:
             st.toast(f"Navigating to {item}...", icon="🚀")
     
     st.markdown("""
-    <div style="background: radial-gradient(120% 100% at 20% 0%, #1e3a5f 0%, #0b1220 70%); border: 1px solid rgba(255,153,0,0.18); border-radius: 12px; padding: 16px; margin-top: 28px; color: white; position: relative; overflow: hidden;">
-        <div style="width:26px; height:26px; border-radius:8px; background:rgba(255,153,0,0.15); display:flex; align-items:center; justify-content:center; font-size:13px; margin-bottom:10px;">🌿</div>
+    <div style="background: radial-gradient(120% 100% at 20% 0%, #1e3a8a 0%, #0b1220 70%); border: 1px solid rgba(59,130,246,0.22); border-radius: 12px; padding: 16px; margin-top: 28px; color: white; position: relative; overflow: hidden;">
+        <div style="width:26px; height:26px; border-radius:8px; background:rgba(59,130,246,0.18); display:flex; align-items:center; justify-content:center; font-size:13px; margin-bottom:10px;">🌿</div>
         <div style="font-weight: 800; font-size: 12px; line-height:1.3;">Healthy Teams Build a Stronger Tomorrow</div>
         <div style="font-size: 10.5px; color: #93c5fd; margin-top: 6px; line-height: 1.4;">Better insights. Better conversations. A healthier workplace.</div>
     </div>
