@@ -77,57 +77,50 @@ st.markdown("""
 
 
     /* =====================================================================
-       KPI CARD + SEAMLESS "VIEW" AREA (looks like one tile, no overlap)
+       CLICKABLE TILE: entire card is clickable, no visible "View" button
        ===================================================================== */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
-        border-bottom: none;
-        border-radius: 12px 12px 0 0; 
-        padding: 14px 16px 2px 16px; 
+        border-radius: 12px; 
+        padding: 14px 16px; 
+        height: 95px;
+        margin-bottom: 0px; 
         transition: all 0.2s ease;
-    }
-    .kpi-card:hover {
-        border-color: #38bdf8;
+        position: relative;
+        z-index: 1;
     }
 
-    /* Pull the button's element-container up by 1px so it visually joins the card (removes double border) */
+    /* Make the column a positioning context and give hover feedback on the card */
+    div[data-testid="column"]:has(.kpi-btn-wrapper) {
+        position: relative !important;
+    }
+    div[data-testid="column"]:has(.kpi-btn-wrapper):hover .kpi-card {
+        border-color: #38bdf8;
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+    }
+
+    /* The real Streamlit button becomes an invisible full-card overlay so the whole tile is clickable */
     div.element-container:has(.kpi-btn-wrapper) + div.element-container {
-        margin-top: -1px !important;
-        margin-bottom: 15px !important;
+        position: absolute !important;
+        inset: 0 !important;
+        margin: 0 !important;
+        z-index: 5 !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton {
-        display: flex !important;
-        justify-content: flex-end !important;
         width: 100% !important;
-        background: white !important;
-        border: 1px solid #e2e8f0 !important;
-        border-top: none !important;
-        border-radius: 0 0 12px 12px !important;
-        padding: 0 12px 10px 12px !important;
+        height: 100% !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button {
-        background-color: #f0f9ff !important;
-        color: #0284c7 !important;
-        border: 1px solid #bae6fd !important;
-        border-radius: 12px !important;
-        padding: 2px 10px !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        min-height: 26px !important;
-        height: 26px !important;
-        width: fit-content !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: transparent !important;
+        border: none !important;
         box-shadow: none !important;
-        opacity: 1 !important; /* Fully Visible and Clickable! */
+        opacity: 0 !important; /* invisible but still clickable */
+        cursor: pointer !important;
+        padding: 0 !important;
         margin: 0 !important;
-    }
-    div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button:hover {
-        background-color: #e0f2fe !important;
-        border-color: #7dd3fc !important;
-        color: #0369a1 !important;
-    }
-    div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button p {
-        font-size: 11px !important;
     }
     /* ===================================================================== */
 
@@ -357,8 +350,8 @@ with col_main:
         </div>
         <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        # REAL BUTTON! This will open the detailed breakdown.
-        st.button("👀 View", key="btn_all", on_click=toggle_view, args=("Total Employees",))
+        # INVISIBLE FULL-CARD BUTTON: makes the entire tile clickable
+        st.button("View", key="btn_all", on_click=toggle_view, args=("Total Employees",))
         
     with k2:
         st.markdown(f"""
@@ -371,7 +364,7 @@ with col_main:
         </div>
         <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("👀 View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
+        st.button("View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
         
     with k3:
         st.markdown(f"""
@@ -384,7 +377,7 @@ with col_main:
         </div>
         <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("👀 View", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
+        st.button("View", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
         
     with k4:
         st.markdown(f"""
@@ -397,9 +390,9 @@ with col_main:
         </div>
         <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("👀 View", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
+        st.button("View", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
 
-    # --- DYNAMIC DATA VIEWER (OPENS WHEN BUTTON IS CLICKED) ---
+    # --- DYNAMIC DATA VIEWER (OPENS WHEN TILE IS CLICKED) ---
     if st.session_state.active_view:
         st.markdown(f"""
         <div style="background-color: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 16px; margin-top: 8px;">
