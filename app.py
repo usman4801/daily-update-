@@ -49,7 +49,7 @@ st.markdown("""
         border-right: 1px solid rgba(255,255,255,0.06) !important;
     }
     section[data-testid="stSidebar"] .block-container {
-        padding: 18px 14px !important;
+        padding: 8px 14px !important;
     }
 
     /* Sidebar Navigation Buttons */
@@ -63,7 +63,7 @@ st.markdown("""
         outline: none !important;
         font-weight: 500 !important;
         font-size: 13.5px !important;
-        padding: 7px 4px !important;
+        padding: 4px 4px !important;
         min-height: unset !important;
         border-radius: 0 !important;
         text-align: left !important;
@@ -89,7 +89,7 @@ st.markdown("""
         font-weight: 800;
         letter-spacing: 1px;
         color: #4b5768;
-        margin: 4px 0 10px 12px;
+        margin: 4px 0 4px 4px;
         text-transform: uppercase;
     }
     /* =================================================================== */
@@ -191,17 +191,17 @@ st.markdown("""
 # ----------------- SIDEBAR (REDESIGNED) -----------------
 with st.sidebar:
     st.markdown("""
-    <div style="padding: 4px 0 20px 0; overflow: visible;">
-        <svg width="150" height="40" viewBox="0 0 150 40" xmlns="http://www.w3.org/2000/svg" style="display:block; overflow: visible;">
-            <text x="0" y="25" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="800" font-size="24" fill="#FFFFFF" letter-spacing="-0.5">amazon</text>
-            <path d="M3 30 C 34 43, 76 43, 107 28" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-            <path d="M100 24 L109 28 L101 34" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <div style="padding: 0 0 12px 0; overflow: visible;">
+        <svg width="150" height="42" viewBox="0 0 150 42" xmlns="http://www.w3.org/2000/svg" style="display:block; overflow: visible;">
+            <text x="0" y="26" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="900" font-size="26" fill="#FFFFFF" letter-spacing="-0.8">amazon</text>
+            <path d="M3 32 C 34 46, 76 46, 107 30" stroke="#FF9900" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+            <path d="M99 25 L110 30 L100 37" stroke="#FF9900" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <div style="display:inline-block; margin-top:10px; padding:4px 10px; background: rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:20px; font-size:10px; font-weight:700; color:#cbd5e1; letter-spacing:0.6px;">
+        <div style="display:inline-block; margin-top:8px; padding:4px 10px; background: rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:20px; font-size:10px; font-weight:700; color:#cbd5e1; letter-spacing:0.6px;">
             PEOPLE ANALYTICS
         </div>
     </div>
-    <div style="height:1px; background: rgba(255,255,255,0.08); margin: 0 0 16px 0;"></div>
+    <div style="height:1px; background: rgba(255,255,255,0.08); margin: 0 0 10px 0;"></div>
     <div class="nav-label">Main Menu</div>
     """, unsafe_allow_html=True)
 
