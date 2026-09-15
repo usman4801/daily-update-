@@ -241,11 +241,11 @@ st.markdown("""
 col_main, col_side = st.columns([7.4, 2.6])
 
 with col_main:
-    # 1. Hero Banner Image (Assuming you have downloaded final_banner_1.png)
+    # 1. Hero Banner Image (Fixed to banner.png)
     try:
-        st.image("final_banner_1.png", use_container_width=True)
+        st.image("banner.png", use_container_width=True)
     except:
-        st.info("Please make sure 'final_banner_1.png' is in the same folder as app.py")
+        st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
     # 2. Metric KPI Cards
