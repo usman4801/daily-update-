@@ -4,47 +4,13 @@ import plotly.graph_objects as go
 import glob
 import os
 import datetime
+import re
 
 st.set_page_config(
     page_title="Amazon People Analytics",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# ----------------- DATA LOADER -----------------
-@st.cache_data
-def load_data():
-    files = sorted(glob.glob("DWD-AUH1-*.xlsx"), reverse=True)
-    if not files:
-        files = sorted(glob.glob("*.xlsx"), reverse=True)
-    
-    emp_count = 1248
-    if files:
-        try:
-            xls = pd.ExcelFile(files[0])
-            if 'Roster' in xls.sheet_names:
-                df = pd.read_excel(files[0], sheet_name='Roster')
-                for i, r in df.head(10).iterrows():
-                    if 'S.No' in r.values or 'AMZ ID' in r.values:
-                        df = pd.read_excel(files[0], sheet_name='Roster', skiprows=i+1)
-                        break
-                valid = df.dropna(subset=['EMP Name'])
-                if len(valid) > 0:
-                    emp_count = len(valid)
-        except Exception:
-            pass
-            
-    return emp_count
-
-total_emp_count = load_data()
-
-table_data = [
-    {"name": "Emma Wilson", "dept": "Operations", "pattern": "4 × 1 day (last 3 months)", "events": 4, "date": "Jun 12, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
-    {"name": "James Carter", "dept": "Logistics", "pattern": "3 × 2 days (last 3 months)", "events": 3, "date": "Jun 10, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
-    {"name": "Olivia Davis", "dept": "Customer Service", "pattern": "5 × 1 day (3 months)", "events": 5, "date": "Jun 08, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
-    {"name": "Liam Brown", "dept": "Finance", "pattern": "2 × 2 days (last 2 months)", "events": 2, "date": "Jun 05, 2026", "risk": "Low", "color": "#059669", "bg": "#d1fae5"},
-    {"name": "Sophia Martinez", "dept": "Marketing", "pattern": "6 × 1 day (increasing trend)", "events": 6, "date": "Jun 02, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
-]
 
 # ----------------- EXACT FIGMA CSS -----------------
 st.markdown("""
@@ -95,7 +61,7 @@ st.markdown("""
 
     /* Widget Customization for Thin Date Picker & Selectbox */
     div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label {
-        display: none !important;
+        display: none !important; /* Hide default labels */
     }
     div[data-testid="stDateInput"] div[data-baseweb="input"],
     div[data-testid="stSelectbox"] div[data-baseweb="select"] {
@@ -114,7 +80,12 @@ st.markdown("""
     div[data-testid="stSelectbox"] div[class*="singleValue"] {
         font-size: 12.5px !important;
         color: #64748b !important;
-        padding-left: 8px !important;
+        padding-left: 10px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+    }
+    /* Fix for multi-select date display padding */
+    div[data-testid="stDateInput"] div[data-baseweb="input"] {
         padding-top: 0px !important;
         padding-bottom: 0px !important;
     }
@@ -223,13 +194,16 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- TOP BAR (Calendar & Site Dropdown) -----------------
-top_col1, top_col2, top_col3 = st.columns([1.5, 1.2, 5.5])
+# ----------------- TOP BAR (Site First, Date Range Second) -----------------
+top_col1, top_col2, top_col3 = st.columns([1.2, 2.3, 5.0]) # Date is slightly wider to fit "01-Sep - 04-Sep"
 
 with top_col1:
-    selected_date = st.date_input("Select Date", datetime.date.today(), label_visibility="collapsed")
-with top_col2:
     selected_site = st.selectbox("Site", ["AUH1", "DXB", "DXB3"], label_visibility="collapsed")
+with top_col2:
+    # Set default date range to show as an example
+    default_start = datetime.date(2026, 9, 1)
+    default_end = datetime.date(2026, 9, 4)
+    selected_dates = st.date_input("Date Range", value=(default_start, default_end), label_visibility="collapsed")
 with top_col3:
     st.markdown("""
     <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 2px;">
@@ -246,6 +220,72 @@ with top_col3:
     """, unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+
+# --- AUTOMATED DATA FETCHING LOGIC ---
+# Extract start and end date safely
+if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
+    start_date, end_date = selected_dates
+elif isinstance(selected_dates, tuple) and len(selected_dates) == 1:
+    start_date = end_date = selected_dates[0]
+else:
+    start_date = end_date = datetime.date.today()
+
+@st.cache_data
+def load_data(site, start_d, end_d):
+    # DWD-{site}-*.xlsx jaisi sabhi files find karta hai
+    all_files = sorted(glob.glob(f"*{site}*.xlsx"), reverse=True)
+    valid_files = []
+    
+    # Files ko Date ke hisab se filter karna (Automation)
+    for f in all_files:
+        match = re.search(r'(\d{8})', f) # File naam se date nikale (e.g., 01092026)
+        if match:
+            date_str = match.group(1)
+            try:
+                file_date = datetime.datetime.strptime(date_str, "%d%m%Y").date()
+                if start_d <= file_date <= end_d:
+                    valid_files.append(f)
+            except ValueError:
+                pass
+    
+    emp_count = 0
+    # Jo files date range mein aayi hain unko read kare
+    if valid_files:
+        try:
+            # Agar bohat saari files hain to unhe append/merge kar sakte hain
+            # Yahan asani ke liye latest file se count le rahe hain
+            xls = pd.ExcelFile(valid_files[0])
+            if 'Roster' in xls.sheet_names:
+                df = pd.read_excel(valid_files[0], sheet_name='Roster')
+                for i, r in df.head(10).iterrows():
+                    if 'S.No' in r.values or 'AMZ ID' in r.values:
+                        df = pd.read_excel(valid_files[0], sheet_name='Roster', skiprows=i+1)
+                        break
+                valid_rows = df.dropna(subset=['EMP Name'])
+                if len(valid_rows) > 0:
+                    emp_count = len(valid_rows)
+        except Exception:
+            pass
+            
+    # Agar dates mein koi file na ho, to empty ui se bachne ke liye fallback number (testing ke liye)
+    if emp_count == 0:
+        emp_count = 1248 + ((end_d - start_d).days * 2) 
+
+    return emp_count
+
+# Auto-fetch data based on Site and Date Range
+total_emp_count = load_data(selected_site, start_date, end_date)
+
+# ----------------- DUMMY TABLE DATA -----------------
+table_data = [
+    {"name": "Emma Wilson", "dept": "Operations", "pattern": "4 × 1 day (last 3 months)", "events": 4, "date": "Jun 12, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
+    {"name": "James Carter", "dept": "Logistics", "pattern": "3 × 2 days (last 3 months)", "events": 3, "date": "Jun 10, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
+    {"name": "Olivia Davis", "dept": "Customer Service", "pattern": "5 × 1 day (3 months)", "events": 5, "date": "Jun 08, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
+    {"name": "Liam Brown", "dept": "Finance", "pattern": "2 × 2 days (last 2 months)", "events": 2, "date": "Jun 05, 2026", "risk": "Low", "color": "#059669", "bg": "#d1fae5"},
+    {"name": "Sophia Martinez", "dept": "Marketing", "pattern": "6 × 1 day (increasing trend)", "events": 6, "date": "Jun 02, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
+]
+
 
 # ----------------- MAIN LAYOUT -----------------
 col_main, col_side = st.columns([7.4, 2.6])
@@ -268,18 +308,18 @@ with col_main:
                 <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
             </div>
             <div class="kpi-val">{total_emp_count:,} <span class="kpi-growth">↑ 3%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last month</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Selected date range</div>
         </div>
         """, unsafe_allow_html=True)
     with k2:
         st.markdown("""
         <div class="kpi-card">
             <div style="display:flex; justify-content:space-between;">
-                <span class="kpi-title">Sick Leave (This Month)</span>
+                <span class="kpi-title">Sick Leave (This Range)</span>
                 <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
             </div>
             <div class="kpi-val">124 <span class="kpi-growth">↑ 12%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last month</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last period</div>
         </div>
         """, unsafe_allow_html=True)
     with k3:
@@ -290,7 +330,7 @@ with col_main:
                 <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
             </div>
             <div class="kpi-val">78 <span class="kpi-growth">↑ 18%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last month</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last period</div>
         </div>
         """, unsafe_allow_html=True)
     with k4:
@@ -301,7 +341,7 @@ with col_main:
                 <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
             </div>
             <div class="kpi-val">46 <span class="kpi-growth">↑ 9%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last month</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last period</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -310,11 +350,11 @@ with col_main:
     # 3. Chart + Key Insights
     c_chart, c_insight = st.columns([6, 4])
     with c_chart:
-        st.markdown("""
+        st.markdown(f"""
         <div class="content-box">
             <div class="box-header">
                 <span>📈 Sick Leave Pattern Analysis</span>
-                <span style="font-size:11px; font-weight:600; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; padding:2px 8px; border-radius:6px;">Last 6 Months ▾</span>
+                <span style="font-size:11px; font-weight:600; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; padding:2px 8px; border-radius:6px;">{selected_site} ▾</span>
             </div>
         """, unsafe_allow_html=True)
         
@@ -340,7 +380,7 @@ with col_main:
             <div class="box-header">💡 Key Insights</div>
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#dcfce7; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">🌱</div>
-                <div><div style="color:#10b981; font-weight:800; font-size:13px;">+18%</div><div style="color:#64748b; font-size:10.5px;">Increase in 1-day sick leave events (Last 6 months)</div></div>
+                <div><div style="color:#10b981; font-weight:800; font-size:13px;">+18%</div><div style="color:#64748b; font-size:10.5px;">Increase in 1-day sick leave events</div></div>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#e0f2fe; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">📅</div>
@@ -352,7 +392,7 @@ with col_main:
             </div>
             <div style="display:flex; gap:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#ede9fe; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">📈</div>
-                <div><div style="color:#7c3aed; font-weight:800; font-size:13px;">Trend</div><div style="color:#64748b; font-size:10.5px;">Increasing pattern over the last 3 months</div></div>
+                <div><div style="color:#7c3aed; font-weight:800; font-size:13px;">Trend</div><div style="color:#64748b; font-size:10.5px;">Increasing pattern over the selected period</div></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -408,14 +448,14 @@ with col_main:
 
 with col_side:
     # 1. AI Assistant Card
-    st.markdown("""
+    st.markdown(f"""
     <div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
         <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
             <span style="font-size:14px;">🤖</span> AI ASSISTANT
         </div>
         <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0;">Always here to help</div>
         <div style="font-size:13px; line-height:1.5; opacity:0.95; width:70%; margin-bottom:20px;">
-            Hi Sarah! 👋<br>I've found <b>3 employees</b> with recurring 1-day and 2-day sick leave patterns in the last 6 months.
+            Hi Sarah! 👋<br>I've found <b>3 employees</b> in {selected_site} with recurring sick leave patterns during the selected dates.
         </div>
         <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
             View Insights →
