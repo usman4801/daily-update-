@@ -51,7 +51,7 @@ st.markdown("""
         padding: 16px 12px !important;
     }
 
-    /* Normal Streamlit Buttons (Like Quick Actions) */
+    /* General Streamlit Buttons (Like Quick Actions) */
     div.stButton > button {
         border: 1px solid #e2e8f0 !important;
         background-color: white !important;
@@ -75,42 +75,59 @@ st.markdown("""
     section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1e293b !important; color: #38bdf8 !important; }
     section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
+
     /* =====================================================================
-       MAGIC CSS: INVISIBLE BUTTON OVERLAYS (Fixes Alignment & Click Issues)
+       MAGIC CSS: "VIEW" BUTTON PERFECTLY INSIDE THE KPI CARD! 
        ===================================================================== */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
         border-radius: 12px; 
         padding: 14px 16px; 
-        height: 110px; /* Fixed height for exact match */
+        height: 95px; /* Clean height without grey text */
         margin-bottom: 0px; 
         transition: all 0.2s ease;
-        position: relative;
     }
-    
-    /* Hover effect for the tile */
-    div.element-container:has(.btn-overlay):hover .kpi-card,
-    div.element-container:has(.btn-overlay) + div.element-container:hover {
-        border-color: #38bdf8 !important;
-        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15) !important;
-        transform: translateY(-2px) !important;
+    .kpi-card:hover {
+        border-color: #38bdf8;
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
     }
-    
-    /* Pull Streamlit button exactly over the HTML card and make it invisible */
-    div.element-container:has(.btn-overlay) + div.element-container {
-        margin-top: -110px !important;
-        margin-bottom: 0px !important;
-        height: 110px !important;
+
+    /* Target the button immediately following our kpi-btn-wrapper */
+    div.element-container:has(.kpi-btn-wrapper) + div.element-container {
+        margin-top: -42px !important; /* Pull up inside the card */
+        margin-bottom: 15px !important;
+        height: 0px !important; /* Take zero extra vertical space */
         z-index: 10 !important;
     }
-    div.element-container:has(.btn-overlay) + div.element-container div.stButton > button {
-        opacity: 0 !important; /* Button is completely invisible */
-        height: 110px !important;
+    div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton {
+        display: flex !important;
+        justify-content: flex-end !important;
+        padding-right: 15px !important;
         width: 100% !important;
-        cursor: pointer !important;
-        padding: 0 !important;
+    }
+    div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button {
+        background-color: #f0f9ff !important;
+        color: #0284c7 !important;
+        border: 1px solid #bae6fd !important;
+        border-radius: 12px !important;
+        padding: 2px 10px !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        min-height: 26px !important;
+        height: 26px !important;
+        width: fit-content !important;
+        box-shadow: none !important;
+        opacity: 1 !important; /* Fully Visible and Clickable! */
         margin: 0 !important;
+    }
+    div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button:hover {
+        background-color: #e0f2fe !important;
+        border-color: #7dd3fc !important;
+        color: #0369a1 !important;
+    }
+    div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button p {
+        font-size: 11px !important;
     }
     /* ===================================================================== */
 
@@ -326,7 +343,7 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # --- KPI Row with PERFECTLY INSIDE HTML BUTTONS ---
+    # --- KPI Row ---
     k1, k2, k3, k4 = st.columns(4)
     
     with k1:
@@ -337,14 +354,11 @@ with col_main:
                 <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
             </div>
             <div class="kpi-val">{total_emp_count:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                <span style="font-size:10px; color:#94a3b8;">In selected period</span>
-                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
         </div>
-        <div class="btn-overlay"></div>
+        <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("1", key="btn_all", on_click=toggle_view, args=("Total Employees",))
+        # REAL BUTTON! This will open the detailed breakdown.
+        st.button("👀 View", key="btn_all", on_click=toggle_view, args=("Total Employees",))
         
     with k2:
         st.markdown(f"""
@@ -354,14 +368,10 @@ with col_main:
                 <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
             </div>
             <div class="kpi-val">{total_sick:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                <span style="font-size:10px; color:#94a3b8;">Total SL days</span>
-                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
         </div>
-        <div class="btn-overlay"></div>
+        <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("2", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
+        st.button("👀 View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
         
     with k3:
         st.markdown(f"""
@@ -371,14 +381,10 @@ with col_main:
                 <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
             </div>
             <div class="kpi-val">{one_day_events:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                <span style="font-size:10px; color:#94a3b8;">Single day leaves</span>
-                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
         </div>
-        <div class="btn-overlay"></div>
+        <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("3", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
+        st.button("👀 View", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
         
     with k4:
         st.markdown(f"""
@@ -388,16 +394,12 @@ with col_main:
                 <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
             </div>
             <div class="kpi-val">{two_day_events:,}</div>
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                <span style="font-size:10px; color:#94a3b8;">Consecutive leaves</span>
-                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
-            </div>
         </div>
-        <div class="btn-overlay"></div>
+        <div class="kpi-btn-wrapper"></div>
         """, unsafe_allow_html=True)
-        st.button("4", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
+        st.button("👀 View", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
 
-    # --- DYNAMIC DATA VIEWER (Search Bar Removed, Clean Data Table Added) ---
+    # --- DYNAMIC DATA VIEWER (OPENS WHEN BUTTON IS CLICKED) ---
     if st.session_state.active_view:
         st.markdown(f"""
         <div style="background-color: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 16px; margin-top: 8px;">
