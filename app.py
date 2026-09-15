@@ -61,7 +61,7 @@ st.markdown("""
 
     /* Widget Customization for Thin Date Picker & Selectbox */
     div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label {
-        display: none !important; /* Hide default labels */
+        display: none !important;
     }
     div[data-testid="stDateInput"] div[data-baseweb="input"],
     div[data-testid="stSelectbox"] div[data-baseweb="select"] {
@@ -84,7 +84,6 @@ st.markdown("""
         padding-top: 0px !important;
         padding-bottom: 0px !important;
     }
-    /* Fix for multi-select date display padding */
     div[data-testid="stDateInput"] div[data-baseweb="input"] {
         padding-top: 0px !important;
         padding-bottom: 0px !important;
@@ -195,12 +194,11 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ----------------- TOP BAR (Site First, Date Range Second) -----------------
-top_col1, top_col2, top_col3 = st.columns([1.2, 2.3, 5.0]) # Date is slightly wider to fit "01-Sep - 04-Sep"
+top_col1, top_col2, top_col3 = st.columns([1.2, 2.3, 5.0])
 
 with top_col1:
     selected_site = st.selectbox("Site", ["AUH1", "DXB", "DXB3"], label_visibility="collapsed")
 with top_col2:
-    # Set default date range to show as an example
     default_start = datetime.date(2026, 9, 1)
     default_end = datetime.date(2026, 9, 4)
     selected_dates = st.date_input("Date Range", value=(default_start, default_end), label_visibility="collapsed")
@@ -221,9 +219,7 @@ with top_col3:
 
 st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
-
-# --- AUTOMATED DATA FETCHING LOGIC ---
-# Extract start and end date safely
+# --- AUTOMATED DATA FETCHING LOGIC (ORIGINAL FILES) ---
 if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
     start_date, end_date = selected_dates
 elif isinstance(selected_dates, tuple) and len(selected_dates) == 1:
@@ -232,60 +228,131 @@ else:
     start_date = end_date = datetime.date.today()
 
 @st.cache_data
-def load_data(site, start_d, end_d):
-    # DWD-{site}-*.xlsx jaisi sabhi files find karta hai
+def load_real_data(site, start_d, end_d):
     all_files = sorted(glob.glob(f"*{site}*.xlsx"), reverse=True)
     valid_files = []
     
-    # Files ko Date ke hisab se filter karna (Automation)
+    # Matching Dates from File Name
     for f in all_files:
-        match = re.search(r'(\d{8})', f) # File naam se date nikale (e.g., 01092026)
+        match = re.search(r'(\d{8})', f)
         if match:
             date_str = match.group(1)
             try:
                 file_date = datetime.datetime.strptime(date_str, "%d%m%Y").date()
                 if start_d <= file_date <= end_d:
-                    valid_files.append(f)
+                    valid_files.append((file_date, f))
             except ValueError:
                 pass
-    
-    emp_count = 0
-    # Jo files date range mein aayi hain unko read kare
-    if valid_files:
+                
+    if not valid_files:
+        return pd.DataFrame()
+        
+    dfs = []
+    for f_date, f in valid_files:
         try:
-            # Agar bohat saari files hain to unhe append/merge kar sakte hain
-            # Yahan asani ke liye latest file se count le rahe hain
-            xls = pd.ExcelFile(valid_files[0])
+            xls = pd.ExcelFile(f)
             if 'Roster' in xls.sheet_names:
-                df = pd.read_excel(valid_files[0], sheet_name='Roster')
-                for i, r in df.head(10).iterrows():
-                    if 'S.No' in r.values or 'AMZ ID' in r.values:
-                        df = pd.read_excel(valid_files[0], sheet_name='Roster', skiprows=i+1)
+                df = pd.read_excel(f, sheet_name='Roster')
+                
+                # Dynamic Header Finding (S.No, EMP Name ya AMZ ID)
+                header_idx = 0
+                for i, row in df.head(15).iterrows():
+                    row_strs = [str(val).strip() for val in row.values]
+                    if 'EMP Name' in row_strs or 'AMZ ID' in row_strs or 'S.No' in row_strs:
+                        header_idx = i
                         break
-                valid_rows = df.dropna(subset=['EMP Name'])
-                if len(valid_rows) > 0:
-                    emp_count = len(valid_rows)
+                
+                df = pd.read_excel(f, sheet_name='Roster', skiprows=header_idx+1)
+                df.columns = df.columns.astype(str).str.strip() 
+                
+                if 'EMP Name' in df.columns and 'Attendance' in df.columns:
+                    temp_df = df[['EMP Name', 'Department', 'Attendance']].copy()
+                    temp_df['Date'] = f_date
+                    dfs.append(temp_df)
         except Exception:
             pass
             
-    # Agar dates mein koi file na ho, to empty ui se bachne ke liye fallback number (testing ke liye)
-    if emp_count == 0:
-        emp_count = 1248 + ((end_d - start_d).days * 2) 
+    if dfs:
+        return pd.concat(dfs, ignore_index=True)
+    return pd.DataFrame()
 
-    return emp_count
+# Load Original DataFrame
+df = load_real_data(selected_site, start_date, end_date)
 
-# Auto-fetch data based on Site and Date Range
-total_emp_count = load_data(selected_site, start_date, end_date)
+# Process Original Data
+total_emp_count = 0
+total_sick = 0
+one_day_events = 0
+two_day_events = 0
+table_data = []
+chart_fig = go.Figure()
 
-# ----------------- DUMMY TABLE DATA -----------------
-table_data = [
-    {"name": "Emma Wilson", "dept": "Operations", "pattern": "4 × 1 day (last 3 months)", "events": 4, "date": "Jun 12, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
-    {"name": "James Carter", "dept": "Logistics", "pattern": "3 × 2 days (last 3 months)", "events": 3, "date": "Jun 10, 2026", "risk": "Medium", "color": "#d97706", "bg": "#fef3c7"},
-    {"name": "Olivia Davis", "dept": "Customer Service", "pattern": "5 × 1 day (3 months)", "events": 5, "date": "Jun 08, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
-    {"name": "Liam Brown", "dept": "Finance", "pattern": "2 × 2 days (last 2 months)", "events": 2, "date": "Jun 05, 2026", "risk": "Low", "color": "#059669", "bg": "#d1fae5"},
-    {"name": "Sophia Martinez", "dept": "Marketing", "pattern": "6 × 1 day (increasing trend)", "events": 6, "date": "Jun 02, 2026", "risk": "High", "color": "#dc2626", "bg": "#fee2e2"},
-]
+if not df.empty:
+    latest_date = df['Date'].max()
+    # Unique Employees in this duration
+    total_emp_count = df['EMP Name'].nunique()
+    
+    # Filter Only Sick Leaves (SL)
+    sick_df = df[df['Attendance'].astype(str).str.upper() == 'SL'].copy()
+    total_sick = len(sick_df)
+    
+    if not sick_df.empty:
+        # Calculate Real 1-Day vs 2+ Days Patterns
+        sick_df = sick_df.sort_values(by=['EMP Name', 'Date'])
+        for emp, group in sick_df.groupby('EMP Name'):
+            dates = sorted(group['Date'].tolist())
+            if len(dates) == 1:
+                one_day_events += 1
+            else:
+                cons = 1
+                for i in range(1, len(dates)):
+                    if (dates[i] - dates[i-1]).days == 1:
+                        cons += 1
+                    else:
+                        if cons == 1: one_day_events += 1
+                        elif cons >= 2: two_day_events += 1
+                        cons = 1
+                if cons == 1: one_day_events += 1
+                elif cons >= 2: two_day_events += 1
+                
+        # Generate Employees Table based on actual risk (Top 5)
+        sl_counts = sick_df.groupby(['EMP Name', 'Department']).agg(
+            events=('Date', 'count'),
+            last_date=('Date', 'max')
+        ).reset_index().sort_values(by='events', ascending=False).head(5)
+        
+        for _, row in sl_counts.iterrows():
+            events = row['events']
+            risk = "High" if events >= 3 else ("Medium" if events == 2 else "Low")
+            bg = "#fee2e2" if risk == "High" else ("#fef3c7" if risk == "Medium" else "#d1fae5")
+            color = "#dc2626" if risk == "High" else ("#d97706" if risk == "Medium" else "#059669")
+            
+            table_data.append({
+                "name": row['EMP Name'],
+                "dept": row['Department'] if pd.notna(row['Department']) else "Unknown",
+                "pattern": f"{events} sick day(s)",
+                "events": events,
+                "date": row['last_date'].strftime("%b %d, %Y"),
+                "risk": risk,
+                "color": color,
+                "bg": bg
+            })
+            
+        # Daily Chart Data Generation
+        daily_sick = sick_df.groupby('Date').size().reset_index(name='count')
+        chart_fig.add_trace(go.Scatter(
+            x=daily_sick['Date'], y=daily_sick['count'], 
+            mode='lines+markers', name='Daily Sick Leave', 
+            line=dict(color='#2563eb', width=2.5), marker=dict(size=6)
+        ))
 
+# Ensure chart looks correct even if empty
+chart_fig.update_layout(
+    height=200, margin=dict(l=25, r=10, t=10, b=20),
+    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+    xaxis=dict(showgrid=False, linecolor='#e2e8f0'),
+    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', rangemode='tozero')
+)
 
 # ----------------- MAIN LAYOUT -----------------
 col_main, col_side = st.columns([7.4, 2.6])
@@ -298,7 +365,7 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # 2. Metric KPI Cards
+    # 2. Original Data Metric KPI Cards
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -307,41 +374,41 @@ with col_main:
                 <span class="kpi-title">Total Employees</span>
                 <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
             </div>
-            <div class="kpi-val">{total_emp_count:,} <span class="kpi-growth">↑ 3%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Selected date range</div>
+            <div class="kpi-val">{total_emp_count:,}</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">In selected period</div>
         </div>
         """, unsafe_allow_html=True)
     with k2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="kpi-card">
             <div style="display:flex; justify-content:space-between;">
                 <span class="kpi-title">Sick Leave (This Range)</span>
                 <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
             </div>
-            <div class="kpi-val">124 <span class="kpi-growth">↑ 12%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last period</div>
+            <div class="kpi-val">{total_sick:,}</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Total SL days</div>
         </div>
         """, unsafe_allow_html=True)
     with k3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="kpi-card">
             <div style="display:flex; justify-content:space-between;">
-                <span class="kpi-title">1-Day Sick Leave Events</span>
+                <span class="kpi-title">1-Day Sick Events</span>
                 <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
             </div>
-            <div class="kpi-val">78 <span class="kpi-growth">↑ 18%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last period</div>
+            <div class="kpi-val">{one_day_events:,}</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Single day leaves</div>
         </div>
         """, unsafe_allow_html=True)
     with k4:
-        st.markdown("""
+        st.markdown(f"""
         <div class="kpi-card">
             <div style="display:flex; justify-content:space-between;">
-                <span class="kpi-title">2-Day Sick Leave Events</span>
+                <span class="kpi-title">2+ Days Sick Events</span>
                 <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
             </div>
-            <div class="kpi-val">46 <span class="kpi-growth">↑ 9%</span></div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">vs. last period</div>
+            <div class="kpi-val">{two_day_events:,}</div>
+            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Consecutive leaves</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -358,62 +425,51 @@ with col_main:
             </div>
         """, unsafe_allow_html=True)
         
-        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=months, y=[12, 14, 15, 16, 22, 42], mode='lines+markers', name='1-Day Leave', line=dict(color='#2563eb', width=2.5), marker=dict(size=5)))
-        fig.add_trace(go.Scatter(x=months, y=[8, 9, 10, 11, 12, 26], mode='lines+markers', name='2-Day Leave', line=dict(color='#8b5cf6', width=2.5), marker=dict(size=5)))
-        fig.update_layout(
-            height=200,
-            margin=dict(l=25, r=10, t=10, b=20),
-            legend=dict(orientation="h", y=1.15, x=0, font=dict(size=11)),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False, linecolor='#e2e8f0'),
-            yaxis=dict(showgrid=True, gridcolor='#f1f5f9', range=[0, 50])
-        )
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(chart_fig, use_container_width=True, config={'displayModeBar': False})
         st.markdown("</div>", unsafe_allow_html=True)
 
     with c_insight:
-        st.markdown("""
+        st.markdown(f"""
         <div class="content-box" style="height:100%;">
             <div class="box-header">💡 Key Insights</div>
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#dcfce7; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">🌱</div>
-                <div><div style="color:#10b981; font-weight:800; font-size:13px;">+18%</div><div style="color:#64748b; font-size:10.5px;">Increase in 1-day sick leave events</div></div>
+                <div><div style="color:#10b981; font-weight:800; font-size:13px;">{total_sick} Days</div><div style="color:#64748b; font-size:10.5px;">Total SL recorded in selected range</div></div>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#e0f2fe; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">📅</div>
-                <div><div style="color:#0284c7; font-weight:800; font-size:13px;">2x higher</div><div style="color:#64748b; font-size:10.5px;">Sick leave on Mondays and Fridays</div></div>
+                <div><div style="color:#0284c7; font-weight:800; font-size:13px;">{one_day_events} Events</div><div style="color:#64748b; font-size:10.5px;">Single day isolated absences</div></div>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#f3e8ff; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">🏖️</div>
-                <div><div style="color:#9333ea; font-weight:800; font-size:13px;">35%</div><div style="color:#64748b; font-size:10.5px;">of 1-day leaves occur before/after public holidays</div></div>
+                <div><div style="color:#9333ea; font-weight:800; font-size:13px;">{two_day_events} Events</div><div style="color:#64748b; font-size:10.5px;">Prolonged or consecutive sick days</div></div>
             </div>
             <div style="display:flex; gap:10px;">
                 <div style="width:28px; height:28px; border-radius:50%; background:#ede9fe; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">📈</div>
-                <div><div style="color:#7c3aed; font-weight:800; font-size:13px;">Trend</div><div style="color:#64748b; font-size:10.5px;">Increasing pattern over the selected period</div></div>
+                <div><div style="color:#7c3aed; font-weight:800; font-size:13px;">Auto-Sync</div><div style="color:#64748b; font-size:10.5px;">Data directly imported from Roster files</div></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    # 4. Employees Table
-    rows_str = "".join([
-        f"<tr><td><b>{r['name']}</b></td>"
-        f"<td style='color:#64748b;'>{r['dept']}</td>"
-        f"<td style='color:#475569;'>{r['pattern']}</td>"
-        f"<td style='text-align:center; font-weight:600;'>{r['events']}</td>"
-        f"<td style='color:#64748b;'>{r['date']}</td>"
-        f"<td><span class='risk-badge' style='background:{r['bg']}; color:{r['color']};'>{r['risk']}</span></td>"
-        f"<td><span style='color:#2563eb; font-weight:700; cursor:pointer;'>View →</span></td></tr>"
-        for r in table_data
-    ])
-    
+    # 4. Employees Table (Dynamic)
+    rows_str = ""
+    if table_data:
+        for r in table_data:
+            rows_str += f"<tr><td><b>{r['name']}</b></td>"
+            rows_str += f"<td style='color:#64748b;'>{r['dept']}</td>"
+            rows_str += f"<td style='color:#475569;'>{r['pattern']}</td>"
+            rows_str += f"<td style='text-align:center; font-weight:600;'>{r['events']}</td>"
+            rows_str += f"<td style='color:#64748b;'>{r['date']}</td>"
+            rows_str += f"<td><span class='risk-badge' style='background:{r['bg']}; color:{r['color']};'>{r['risk']}</span></td>"
+            rows_str += f"<td><span style='color:#2563eb; font-weight:700; cursor:pointer;'>View →</span></td></tr>"
+    else:
+        rows_str = "<tr><td colspan='7' style='text-align:center; color:#64748b; padding: 24px;'>✅ No sick leave patterns found for the selected date range.</td></tr>"
+        
     st.markdown(f"""
     <div class="content-box">
-        <div class="box-header">👥 Employees with Repeated Sick Leave</div>
+        <div class="box-header">👥 Top At-Risk Employees (Based on SL Frequency)</div>
         <table class="emp-table">
             <thead>
                 <tr>
@@ -453,9 +509,9 @@ with col_side:
         <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
             <span style="font-size:14px;">🤖</span> AI ASSISTANT
         </div>
-        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0;">Always here to help</div>
+        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0;">Data Synced!</div>
         <div style="font-size:13px; line-height:1.5; opacity:0.95; width:70%; margin-bottom:20px;">
-            Hi Sarah! 👋<br>I've found <b>3 employees</b> in {selected_site} with recurring sick leave patterns during the selected dates.
+            Hi Sarah! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b> from the raw roster files in {selected_site}.
         </div>
         <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2;">
             View Insights →
@@ -468,74 +524,81 @@ with col_side:
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px; padding: 10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid #f8fafc;">
-            <div><div style="font-size:11px; font-weight:700;">Top 3 At-Risk Employees</div><div style="font-size:9.5px; color:#64748b;">With recurring sick leave patterns</div></div>
+            <div><div style="font-size:11px; font-weight:700;">Export SL Report</div><div style="font-size:9.5px; color:#64748b;">Download current view as CSV</div></div>
             <span style="color:#94a3b8; font-size:12px;">&gt;</span>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid #f8fafc;">
-            <div><div style="font-size:11px; font-weight:700;">Generate Coaching Conversation</div><div style="font-size:9.5px; color:#64748b;">For selected employee</div></div>
+            <div><div style="font-size:11px; font-weight:700;">Generate Coaching File</div><div style="font-size:9.5px; color:#64748b;">For top at-risk employees</div></div>
             <span style="color:#94a3b8; font-size:12px;">&gt;</span>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px;">
-            <div><div style="font-size:11px; font-weight:700;">View Team Trend</div><div style="font-size:9.5px; color:#64748b;">Sick leave patterns by department</div></div>
+            <div><div style="font-size:11px; font-weight:700;">View Raw Roster</div><div style="font-size:9.5px; color:#64748b;">Open source file metrics</div></div>
             <span style="color:#94a3b8; font-size:12px;">&gt;</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. Donut Chart
+    # 3. Dynamic Donut Chart (Based on Real 1 vs 2+ Days)
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px;">
         <div class="box-header">📊 Leave Duration Breakdown</div>
     """, unsafe_allow_html=True)
-    fig_donut = go.Figure(data=[go.Pie(
-        labels=['1 Day', '2 Days'],
-        values=[78, 46],
-        hole=.72,
-        marker=dict(colors=['#2563eb', '#9333ea']),
-        textinfo='none'
-    )])
-    fig_donut.update_layout(
-        height=150,
-        margin=dict(l=5, r=5, t=5, b=5),
-        showlegend=False,
-        annotations=[dict(text='<b>124</b><br><span style="font-size:9px; color:#64748b;">Total Sick</span>', x=0.5, y=0.5, font_size=14, showarrow=False)]
-    )
-    st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
-    st.markdown("""
-        <div style="display:flex; justify-content:space-around; font-size:10.5px; color:#475569; margin-top:2px;">
-            <span><b style="color:#2563eb;">●</b> 1 Day: <b>78 (63%)</b></span>
-            <span><b style="color:#9333ea;">●</b> 2 Days: <b>46 (37%)</b></span>
+    
+    if (one_day_events + two_day_events) > 0:
+        fig_donut = go.Figure(data=[go.Pie(
+            labels=['1 Day', '2+ Days'],
+            values=[one_day_events, two_day_events],
+            hole=.72,
+            marker=dict(colors=['#2563eb', '#9333ea']),
+            textinfo='none'
+        )])
+        fig_donut.update_layout(
+            height=150, margin=dict(l=5, r=5, t=5, b=5), showlegend=False,
+            annotations=[dict(text=f'<b>{total_sick}</b><br><span style="font-size:9px; color:#64748b;">Total SL</span>', x=0.5, y=0.5, font_size=14, showarrow=False)]
+        )
+        st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+        
+        pct_1 = int(round((one_day_events / (one_day_events + two_day_events)) * 100)) if total_sick > 0 else 0
+        pct_2 = 100 - pct_1
+        
+        st.markdown(f"""
+            <div style="display:flex; justify-content:space-around; font-size:10.5px; color:#475569; margin-top:2px;">
+                <span><b style="color:#2563eb;">●</b> 1 Day: <b>{one_day_events} ({pct_1}%)</b></span>
+                <span><b style="color:#9333ea;">●</b> 2+ Days: <b>{two_day_events} ({pct_2}%)</b></span>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    else:
+         st.markdown("<div style='text-align:center; padding: 20px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data to Display</div></div>", unsafe_allow_html=True)
 
-    # 4. Recent Coaching Activity
+    # 4. Recent Coaching Activity (Dynamic Fallback)
     st.markdown("""
     <div class="content-box" style="margin-bottom: 12px;">
         <div class="box-header">
-            <span>⚡ Recent Coaching</span>
+            <span>⚡ Action Required</span>
             <span style="font-size:10px; color:#2563eb; cursor:pointer;">View All &gt;</span>
         </div>
-        <div style="font-size:11px; padding:6px 0; border-bottom:1px solid #f8fafc; display:flex; justify-content:space-between; align-items:center;">
-            <div><b>Emma Wilson</b><br><span style="font-size:9.5px; color:#94a3b8;">Completed • Jun 10</span></div>
-            <span class="risk-badge" style="background:#fef3c7; color:#b45309;">1-Day Pattern</span>
-        </div>
-        <div style="font-size:11px; padding:6px 0; border-bottom:1px solid #f8fafc; display:flex; justify-content:space-between; align-items:center;">
-            <div><b>James Carter</b><br><span style="font-size:9.5px; color:#94a3b8;">Scheduled • Jun 8</span></div>
-            <span class="risk-badge" style="background:#ede9fe; color:#7c3aed;">2-Day Pattern</span>
-        </div>
-        <div style="font-size:11px; padding:6px 0; display:flex; justify-content:space-between; align-items:center;">
-            <div><b>Olivia Davis</b><br><span style="font-size:9.5px; color:#94a3b8;">In Progress • Jun 6</span></div>
-            <span class="risk-badge" style="background:#fef3c7; color:#b45309;">1-Day Pattern</span>
-        </div>
-    </div>
     """, unsafe_allow_html=True)
+    
+    if len(table_data) > 0:
+        for i, r in enumerate(table_data[:3]):
+            status = "Scheduled" if i == 0 else ("Pending" if i == 1 else "Not Started")
+            st.markdown(f"""
+            <div style="font-size:11px; padding:6px 0; border-bottom:1px solid #f8fafc; display:flex; justify-content:space-between; align-items:center;">
+                <div><b>{r['name']}</b><br><span style="font-size:9.5px; color:#94a3b8;">{status} • {r['date']}</span></div>
+                <span class="risk-badge" style="background:{r['bg']}; color:{r['color']};">{r['risk']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown("<div style='text-align:center; padding: 10px 0; color:#64748b; font-size: 11px;'>No High Risk Employees</div>", unsafe_allow_html=True)
+        
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # 5. Quote Card at Bottom Right
     st.markdown("""
     <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
         <div style="font-size:10.5px; color:#166534; font-weight:600; line-height:1.3;">
-            “The best leaders don't just manage, they support people.”
+            “Data is only useful if it helps us support our people.”
         </div>
         <span style="color:#dc2626; font-size:14px; margin-left:8px;">🤍</span>
     </div>
