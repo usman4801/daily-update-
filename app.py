@@ -86,17 +86,37 @@ st.markdown("""
     section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
     /* Custom KPI Cards Layout */
-    .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 5px; }
+    .kpi-card { 
+        background: white; 
+        border: 1px solid #e2e8f0; 
+        border-radius: 12px; 
+        padding: 14px 16px; 
+        margin-bottom: 0px; 
+        transition: all 0.2s ease;
+    }
+    .kpi-card:hover {
+        border-color: #38bdf8;
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+        transform: translateY(-2px);
+    }
     .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
     .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
-    .kpi-growth { font-size: 11px; font-weight: 700; color: #16a34a; }
 
-    /* Specific Button style for KPI Actions */
-    .kpi-action-btn button {
-        background-color: #f8fafc !important; color: #3b82f6 !important; border-color: #e2e8f0 !important;
-        justify-content: center !important; font-size: 11px !important; min-height: 28px !important; padding: 4px !important;
+    /* GENIUS CSS HACK: Invisible Overlay Buttons over KPI Cards */
+    div[data-testid="column"] div[data-testid="column"] div.stButton > button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: transparent !important; /* Hide text */
+        margin-top: -105px !important; /* Pull up perfectly over the card */
+        height: 105px !important; /* Match card height */
+        width: 100% !important;
+        cursor: pointer !important;
+        z-index: 10 !important;
     }
-    .kpi-action-btn button:hover { background-color: #eff6ff !important; border-color: #93c5fd !important; }
+    div[data-testid="column"] div[data-testid="column"] div.stButton {
+        margin-bottom: -25px !important; /* Remove all extra space below! */
+    }
 
     .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
     .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a; }
@@ -328,7 +348,7 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # --- Clickable KPI Row ---
+    # --- Clickable KPI Row (Tiles completely overlayed by invisible buttons) ---
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -338,12 +358,13 @@ with col_main:
                 <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
             </div>
             <div class="kpi-val">{total_emp_count:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">In selected period</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:10px; color:#94a3b8;">In selected period</span>
+                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
-        st.button("👀 View List", key="btn_all", use_container_width=True, on_click=toggle_view, args=("Total Employees",))
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.button("Total", key="btn_all", on_click=toggle_view, args=("Total Employees",))
         
     with k2:
         st.markdown(f"""
@@ -353,12 +374,13 @@ with col_main:
                 <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
             </div>
             <div class="kpi-val">{total_sick:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Total SL days</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:10px; color:#94a3b8;">Total SL days</span>
+                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
-        st.button("👀 View List", key="btn_sl", use_container_width=True, on_click=toggle_view, args=("Sick Leave",))
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.button("Sick Leave", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
         
     with k3:
         st.markdown(f"""
@@ -368,12 +390,13 @@ with col_main:
                 <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
             </div>
             <div class="kpi-val">{one_day_events:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Single day leaves</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:10px; color:#94a3b8;">Single day leaves</span>
+                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
-        st.button("👀 View Details", key="btn_1day", use_container_width=True, on_click=toggle_view, args=("1-Day Events",))
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.button("1 Day Events", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
         
     with k4:
         st.markdown(f"""
@@ -383,17 +406,18 @@ with col_main:
                 <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
             </div>
             <div class="kpi-val">{two_day_events:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Consecutive leaves</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:10px; color:#94a3b8;">Consecutive leaves</span>
+                <span style="font-size:10px; color:#38bdf8; font-weight:700; background:#f0f9ff; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown('<div class="kpi-action-btn">', unsafe_allow_html=True)
-        st.button("👀 View Details", key="btn_2day", use_container_width=True, on_click=toggle_view, args=("2+ Day Events",))
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.button("2+ Day Events", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
 
     # --- DYNAMIC DATA VIEWER ---
     if st.session_state.active_view:
         st.markdown(f"""
-        <div style="background-color: #f8fafc; border: 1px solid #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="background-color: #f8fafc; border: 1px solid #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 16px; margin-top: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h4 style="margin: 0; color: #0f172a; font-size: 15px;">🔍 Breakdown: {st.session_state.active_view}</h4>
             </div>
@@ -424,7 +448,6 @@ with col_main:
                 st.info("No consecutive sick leave events found.")
                 
         st.markdown("</div>", unsafe_allow_html=True)
-
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
