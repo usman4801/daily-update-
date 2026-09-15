@@ -49,43 +49,40 @@ st.markdown("""
         border-right: 1px solid rgba(255,255,255,0.06) !important;
     }
     section[data-testid="stSidebar"] .block-container {
-        padding: 20px 14px !important;
+        padding: 18px 14px !important;
     }
 
     /* Sidebar Navigation Buttons */
-    section[data-testid="stSidebar"] div.stButton { margin-bottom: 3px !important; }
+    section[data-testid="stSidebar"] div.stButton { margin-bottom: 0px !important; }
     section[data-testid="stSidebar"] div.stButton > button,
     section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] {
-        background-color: transparent !important;
-        border: 1px solid transparent !important;
+        background: none !important;
+        border: none !important;
         color: #8b95a8 !important;
         box-shadow: none !important;
         outline: none !important;
-        font-weight: 600 !important;
+        font-weight: 500 !important;
         font-size: 13.5px !important;
-        padding: 10px 14px !important;
-        min-height: 40px !important;
-        border-radius: 8px !important;
+        padding: 7px 4px !important;
+        min-height: unset !important;
+        border-radius: 0 !important;
         text-align: left !important;
-        transition: background-color 0.15s ease, color 0.15s ease !important;
     }
     section[data-testid="stSidebar"] div.stButton > button:hover,
     section[data-testid="stSidebar"] div.stButton > button:focus,
     section[data-testid="stSidebar"] div.stButton > button:active,
     section[data-testid="stSidebar"] div.stButton > button:focus:not(:active) {
-        border: 1px solid transparent !important;
+        background: none !important;
+        border: none !important;
         outline: none !important;
         box-shadow: none !important;
     }
     section[data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: rgba(148,163,184,0.10) !important;
         color: #ffffff !important;
     }
     section[data-testid="stSidebar"] div.stButton:first-of-type > button {
-        background: linear-gradient(90deg, rgba(37,99,235,0.22), rgba(37,99,235,0.06)) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
-        box-shadow: inset 3px 0 0 0 #3b82f6 !important;
     }
     section[data-testid="stSidebar"] .nav-label {
         font-size: 10px;
@@ -194,11 +191,11 @@ st.markdown("""
 # ----------------- SIDEBAR (REDESIGNED) -----------------
 with st.sidebar:
     st.markdown("""
-    <div style="padding: 4px 4px 20px 4px;">
-        <svg width="128" height="36" viewBox="0 0 128 36" xmlns="http://www.w3.org/2000/svg">
-            <text x="0" y="24" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="800" font-size="23" fill="#FFFFFF" letter-spacing="-0.5">amazon</text>
-            <path d="M3 29 C 32 41, 72 41, 101 27" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-            <path d="M95 23 L103 27 L96 32" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <div style="padding: 4px 0 20px 0; overflow: visible;">
+        <svg width="150" height="40" viewBox="0 0 150 40" xmlns="http://www.w3.org/2000/svg" style="display:block; overflow: visible;">
+            <text x="0" y="25" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="800" font-size="24" fill="#FFFFFF" letter-spacing="-0.5">amazon</text>
+            <path d="M3 30 C 34 43, 76 43, 107 28" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M100 24 L109 28 L101 34" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <div style="display:inline-block; margin-top:10px; padding:4px 10px; background: rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:20px; font-size:10px; font-weight:700; color:#cbd5e1; letter-spacing:0.6px;">
             PEOPLE ANALYTICS
@@ -214,10 +211,9 @@ with st.sidebar:
             st.toast(f"Navigating to {item}...", icon="🚀")
     
     st.markdown("""
-    <div style="background: radial-gradient(120% 100% at 20% 0%, #1e3a8a 0%, #0b1220 70%); border: 1px solid rgba(59,130,246,0.22); border-radius: 12px; padding: 16px; margin-top: 28px; color: white; position: relative; overflow: hidden;">
-        <div style="width:26px; height:26px; border-radius:8px; background:rgba(59,130,246,0.18); display:flex; align-items:center; justify-content:center; font-size:13px; margin-bottom:10px;">🌿</div>
-        <div style="font-weight: 800; font-size: 12px; line-height:1.3;">Healthy Teams Build a Stronger Tomorrow</div>
-        <div style="font-size: 10.5px; color: #93c5fd; margin-top: 6px; line-height: 1.4;">Better insights. Better conversations. A healthier workplace.</div>
+    <div style="padding: 16px 4px 0 4px; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); color: white;">
+        <div style="font-weight: 700; font-size: 12px; line-height:1.3; color:#e2e8f0;">Healthy Teams Build a Stronger Tomorrow</div>
+        <div style="font-size: 11px; color: #7c8aa0; margin-top: 6px; line-height: 1.4;">Better insights. Better conversations. A healthier workplace.</div>
     </div>
     """, unsafe_allow_html=True)
 
