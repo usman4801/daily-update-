@@ -479,18 +479,22 @@ with col_main:
     """, unsafe_allow_html=True)
 
 with col_side:
-    # 1. AI Assistant Card
+    # 1. AI Assistant Card (UPDATED TO MATCH PROVIDED IMAGE)
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 14px; padding: 16px; color: white; margin-bottom: 12px; position: relative;">
-        <div style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">🤖 AI Assistant</div>
-        <div style="font-weight:800; font-size:14px; margin: 2px 0 6px 0;">Always here to help</div>
-        <div style="font-size:11px; line-height:1.4; opacity:0.95; width:70%; margin-bottom:12px;">
+    <div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative;">
+        <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+            AI ASSISTANT
+        </div>
+        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0;">Always here to help</div>
+        <div style="font-size:13px; line-height:1.5; opacity:0.95; width:85%; margin-bottom:20px;">
             Hi Sarah! 👋<br>I've found <b>3 employees</b> with recurring 1-day and 2-day sick leave patterns in the last 6 months.
         </div>
-        <div style="background:white; color:#1d4ed8; border-radius:8px; padding:6px; text-align:center; font-weight:700; font-size:11px; width:65%; cursor:pointer;">
+        <div style="background:white; color:#2563eb; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; display:inline-block; cursor:pointer; width:auto;">
             View Insights →
         </div>
-        <div style="position:absolute; right:8px; bottom:8px; font-size:55px;">🤖</div>
+        <!-- Simple white line-art robot icon -->
+        <svg style="position:absolute; right:15px; bottom:25px;" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8.01" y2="16"></line><line x1="16" y1="16" x2="16.01" y2="16"></line></svg>
     </div>
     """, unsafe_allow_html=True)
 
