@@ -51,7 +51,7 @@ st.markdown("""
         padding: 16px 12px !important;
     }
 
-    /* Regular Streamlit Buttons (Like Quick Actions) */
+    /* Normal Streamlit Buttons (Like Quick Actions) */
     div.stButton > button {
         border: 1px solid #e2e8f0 !important;
         background-color: white !important;
@@ -76,61 +76,41 @@ st.markdown("""
     section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
     /* =====================================================================
-       CSS TRICK: PERFECTLY EMBEDDED BUTTONS IN KPI CARDS (NO EXTRA SPACE)
+       MAGIC CSS: INVISIBLE BUTTON OVERLAYS (Fixes Alignment & Click Issues)
        ===================================================================== */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
         border-radius: 12px; 
         padding: 14px 16px; 
-        height: 110px; /* Fixed height so buttons align perfectly */
+        height: 110px; /* Fixed height for exact match */
         margin-bottom: 0px; 
         transition: all 0.2s ease;
-    }
-    .kpi-card:hover {
-        border-color: #38bdf8;
-        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+        position: relative;
     }
     
-    /* Target the button container exactly after the card */
-    div.element-container:has(.btn-pull-up) + div.element-container {
-        margin-top: -46px !important; /* Pull the button UP into the card */
-        margin-bottom: 15px !important; /* Keep layout clean */
-        height: 0px !important; /* Take ZERO physical space below card */
-        display: flex !important;
-        justify-content: flex-end !important;
-        padding-right: 15px !important;
-        position: relative !important;
+    /* Hover effect for the tile */
+    div.element-container:has(.btn-overlay):hover .kpi-card,
+    div.element-container:has(.btn-overlay) + div.element-container:hover {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* Pull Streamlit button exactly over the HTML card and make it invisible */
+    div.element-container:has(.btn-overlay) + div.element-container {
+        margin-top: -110px !important;
+        margin-bottom: 0px !important;
+        height: 110px !important;
         z-index: 10 !important;
-        pointer-events: none; /* Let container ignore clicks... */
     }
-    div.element-container:has(.btn-pull-up) + div.element-container div.stButton {
-        width: auto !important;
-        pointer-events: auto; /* ...but button catches clicks */
-    }
-    div.element-container:has(.btn-pull-up) + div.element-container div.stButton > button {
-        background-color: #f0f9ff !important;
-        color: #0284c7 !important;
-        border: 1px solid #bae6fd !important;
-        border-radius: 12px !important;
-        padding: 0px 8px !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        min-height: 24px !important;
-        height: 24px !important;
-        width: fit-content !important;
-        box-shadow: none !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    div.element-container:has(.btn-pull-up) + div.element-container div.stButton > button p {
-        font-size: 11px !important;
+    div.element-container:has(.btn-overlay) + div.element-container div.stButton > button {
+        opacity: 0 !important; /* Button is completely invisible */
+        height: 110px !important;
+        width: 100% !important;
+        cursor: pointer !important;
+        padding: 0 !important;
         margin: 0 !important;
-    }
-    div.element-container:has(.btn-pull-up) + div.element-container div.stButton > button:hover {
-        background-color: #e0f2fe !important;
-        border-color: #7dd3fc !important;
     }
     /* ===================================================================== */
 
@@ -199,8 +179,9 @@ with top_col2:
 with top_col3:
     st.markdown("""
     <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 2px;">
-        <span style="font-size:12px; color:#64748b; font-weight:700;">⚡ Filters</span>
-        <span style="font-size:16px;">🔔</span>
+        <span style="font-size:16px; cursor:pointer;" title="Search Employee">🔍</span>
+        <span style="font-size:12px; color:#64748b; font-weight:700; cursor:pointer;">⚡ Filters</span>
+        <span style="font-size:16px; cursor:pointer;">🔔</span>
         <div style="display:flex; align-items:center; gap:10px;">
             <div style="text-align:right;">
                 <div style="font-size:13.5px; font-weight:800; color:#0f172a; margin-top: 1px;">javmuhak</div>
@@ -345,7 +326,7 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # --- KPI Row with PERFECTLY INSIDE BUTTONS ---
+    # --- KPI Row with PERFECTLY INSIDE HTML BUTTONS ---
     k1, k2, k3, k4 = st.columns(4)
     
     with k1:
@@ -356,12 +337,14 @@ with col_main:
                 <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
             </div>
             <div class="kpi-val">{total_emp_count:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">In selected period</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                <span style="font-size:10px; color:#94a3b8;">In selected period</span>
+                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
-        <div class="btn-pull-up"></div>
+        <div class="btn-overlay"></div>
         """, unsafe_allow_html=True)
-        # Sirf "👀 View" text, automatically andar adjust ho jayega
-        st.button("👀 View", key="btn_all", on_click=toggle_view, args=("Total Employees",))
+        st.button("1", key="btn_all", on_click=toggle_view, args=("Total Employees",))
         
     with k2:
         st.markdown(f"""
@@ -371,11 +354,14 @@ with col_main:
                 <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
             </div>
             <div class="kpi-val">{total_sick:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Total SL days</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                <span style="font-size:10px; color:#94a3b8;">Total SL days</span>
+                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
-        <div class="btn-pull-up"></div>
+        <div class="btn-overlay"></div>
         """, unsafe_allow_html=True)
-        st.button("👀 View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
+        st.button("2", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
         
     with k3:
         st.markdown(f"""
@@ -385,11 +371,14 @@ with col_main:
                 <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
             </div>
             <div class="kpi-val">{one_day_events:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Single day leaves</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                <span style="font-size:10px; color:#94a3b8;">Single day leaves</span>
+                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
-        <div class="btn-pull-up"></div>
+        <div class="btn-overlay"></div>
         """, unsafe_allow_html=True)
-        st.button("👀 View", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
+        st.button("3", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
         
     with k4:
         st.markdown(f"""
@@ -399,18 +388,21 @@ with col_main:
                 <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
             </div>
             <div class="kpi-val">{two_day_events:,}</div>
-            <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Consecutive leaves</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                <span style="font-size:10px; color:#94a3b8;">Consecutive leaves</span>
+                <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
+            </div>
         </div>
-        <div class="btn-pull-up"></div>
+        <div class="btn-overlay"></div>
         """, unsafe_allow_html=True)
-        st.button("👀 View", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
+        st.button("4", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
 
-    # --- DYNAMIC DATA VIEWER (Opens Immediately below cards) ---
+    # --- DYNAMIC DATA VIEWER (Search Bar Removed, Clean Data Table Added) ---
     if st.session_state.active_view:
         st.markdown(f"""
-        <div style="background-color: #f8fafc; border: 1px solid #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 16px; margin-top: 8px;">
+        <div style="background-color: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 16px; margin-top: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h4 style="margin: 0; color: #0f172a; font-size: 15px;">🔍 Breakdown: {st.session_state.active_view}</h4>
+                <h4 style="margin: 0; color: #0f172a; font-size: 15px;">📋 Detailed List: {st.session_state.active_view}</h4>
             </div>
         """, unsafe_allow_html=True)
         
