@@ -41,15 +41,54 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Sidebar Styling */
+    /* ===================== SIDEBAR (REDESIGNED) ===================== */
     section[data-testid="stSidebar"] {
-        background-color: #0d172a !important;
-        width: 235px !important;
-        min-width: 235px !important;
+        background-color: #0b1220 !important;
+        width: 250px !important;
+        min-width: 250px !important;
+        border-right: 1px solid rgba(255,255,255,0.06) !important;
     }
     section[data-testid="stSidebar"] .block-container {
-        padding: 16px 12px !important;
+        padding: 20px 14px !important;
     }
+
+    /* Sidebar Navigation Buttons */
+    section[data-testid="stSidebar"] div.stButton { margin-bottom: 4px !important; }
+    section[data-testid="stSidebar"] div.stButton > button {
+        background-color: transparent !important;
+        border: none !important;
+        border-left: 3px solid transparent !important;
+        color: #8b98ac !important;
+        box-shadow: none !important;
+        font-weight: 600 !important;
+        font-size: 13.5px !important;
+        padding: 10px 14px !important;
+        min-height: 40px !important;
+        border-radius: 8px !important;
+        text-align: left !important;
+        transition: all 0.15s ease !important;
+    }
+    section[data-testid="stSidebar"] div.stButton > button:hover {
+        background-color: rgba(255,153,0,0.08) !important;
+        border-left: 3px solid #FF9900 !important;
+        color: #ffffff !important;
+        transform: translateX(2px);
+    }
+    section[data-testid="stSidebar"] div.stButton:first-of-type > button {
+        background-color: rgba(255,153,0,0.14) !important;
+        border-left: 3px solid #FF9900 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    section[data-testid="stSidebar"] .nav-label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        color: #4b5768;
+        margin: 4px 0 10px 12px;
+        text-transform: uppercase;
+    }
+    /* =================================================================== */
 
     /* General Streamlit Buttons (Like Quick Actions) */
     div.stButton > button {
@@ -68,12 +107,6 @@ st.markdown("""
         border-color: #38bdf8 !important;
         background-color: #f0f9ff !important;
     }
-
-    /* Sidebar Navigation Buttons */
-    section[data-testid="stSidebar"] div.stButton { margin-bottom: -10px !important; }
-    section[data-testid="stSidebar"] div.stButton > button { background-color: transparent !important; border: none !important; color: #94a3b8 !important; box-shadow: none !important; font-weight: 500 !important; padding: 6px 12px !important; min-height: 34px !important; border-radius: 8px !important; }
-    section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1e293b !important; color: #38bdf8 !important; }
-    section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
 
     /* =====================================================================
@@ -151,29 +184,33 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- SIDEBAR -----------------
+# ----------------- SIDEBAR (REDESIGNED) -----------------
 with st.sidebar:
     st.markdown("""
-    <div style="display:flex; align-items:center; gap:8px; padding: 4px 0 24px 0;">
-        <svg width="95" height="30" viewBox="0 0 100 32" fill="white">
-            <path d="M53.7 20.3c-2.3 1.8-5.6 2.7-8.5 2.7-4 0-7.6-1.5-10.4-4.1-.2-.2-.2-.5 0-.7l1.4-1.2c.2-.2.5-.1.7.1 2.3 2.1 5.1 3.2 8.3 3.2 2.3 0 4.9-.7 6.8-2.1.3-.2.6 0 .7.3l1 1.8z"/>
-            <path d="M56.8 17.5c-.3-.4-1.9-.2-2.8 0-.3 0-.4-.3-.2-.5 1.4-1.4 3.7-1 4 .2.2 1.2-.8 3.5-2.2 4.7-.2.2-.4.1-.3-.1.5-.9 1.5-3.9 1.5-4.3z"/>
-            <text x="0" y="20" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="21" fill="white">amazon</text>
+    <div style="padding: 4px 4px 20px 4px;">
+        <svg width="128" height="36" viewBox="0 0 128 36" xmlns="http://www.w3.org/2000/svg">
+            <text x="0" y="24" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="800" font-size="23" fill="#FFFFFF" letter-spacing="-0.5">amazon</text>
+            <path d="M3 29 C 32 41, 72 41, 101 27" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M95 23 L103 27 L96 32" stroke="#FF9900" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <div style="font-size:10px; color:#94a3b8; line-height:1.1; font-weight:600; margin-left:4px;">People<br>Analytics</div>
+        <div style="display:inline-block; margin-top:10px; padding:4px 10px; background: rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:20px; font-size:10px; font-weight:700; color:#cbd5e1; letter-spacing:0.6px;">
+            PEOPLE ANALYTICS
+        </div>
     </div>
+    <div style="height:1px; background: rgba(255,255,255,0.08); margin: 0 0 16px 0;"></div>
+    <div class="nav-label">Main Menu</div>
     """, unsafe_allow_html=True)
 
-    nav_items = ["🏠 Home", "📈 Attendance Insights", "🤒 Sick Leave Tracker", "👤 Employee Profiles", "🎯 Coaching & Guidance", "📄 Reports & Analytics", "👥 Team Overview", "⚙️ Settings"]
+    nav_items = ["🏠  Home", "📈  Attendance Insights", "🤒  Sick Leave Tracker", "👤  Employee Profiles", "🎯  Coaching & Guidance", "📄  Reports & Analytics", "👥  Team Overview", "⚙️  Settings"]
     for item in nav_items:
         if st.button(item, key=f"nav_{item}"):
             st.toast(f"Navigating to {item}...", icon="🚀")
     
     st.markdown("""
-    <div style="background: radial-gradient(100% 100% at 50% 0%, #1e3a8a 0%, #0d172a 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-top: 36px; color: white;">
-        <div style="font-weight: 800; font-size: 11px;">Healthy Teams Build a Stronger Tomorrow</div>
-        <div style="font-size: 10px; color: #93c5fd; margin-top: 5px; line-height: 1.3;">Better insights. Better conversations. A healthier workplace.</div>
-        <div style="font-size: 18px; margin-top: 8px; color: #f59e0b;">⌣</div>
+    <div style="background: radial-gradient(120% 100% at 20% 0%, #1e3a5f 0%, #0b1220 70%); border: 1px solid rgba(255,153,0,0.18); border-radius: 12px; padding: 16px; margin-top: 28px; color: white; position: relative; overflow: hidden;">
+        <div style="width:26px; height:26px; border-radius:8px; background:rgba(255,153,0,0.15); display:flex; align-items:center; justify-content:center; font-size:13px; margin-bottom:10px;">🌿</div>
+        <div style="font-weight: 800; font-size: 12px; line-height:1.3;">Healthy Teams Build a Stronger Tomorrow</div>
+        <div style="font-size: 10.5px; color: #93c5fd; margin-top: 6px; line-height: 1.4;">Better insights. Better conversations. A healthier workplace.</div>
     </div>
     """, unsafe_allow_html=True)
 
