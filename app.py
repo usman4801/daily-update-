@@ -93,18 +93,25 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
     }
 
+    /* Make the column a positioning context so the "View" button can anchor to the card */
+    div[data-testid="column"]:has(.kpi-btn-wrapper) {
+        position: relative !important;
+    }
     /* Target the button immediately following our kpi-btn-wrapper */
     div.element-container:has(.kpi-btn-wrapper) + div.element-container {
-        margin-top: -42px !important; /* Pull up inside the card */
-        margin-bottom: 15px !important;
-        height: 0px !important; /* Take zero extra vertical space */
+        position: absolute !important;
+        bottom: 12px !important;
+        right: 14px !important;
+        top: auto !important;
+        left: auto !important;
+        margin: 0 !important;
+        width: auto !important;
+        height: auto !important;
         z-index: 10 !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton {
-        display: flex !important;
-        justify-content: flex-end !important;
-        padding-right: 15px !important;
-        width: 100% !important;
+        display: block !important;
+        width: auto !important;
     }
     div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button {
         background-color: #f0f9ff !important;
@@ -611,7 +618,7 @@ Hi PXT! 👋<br>I've successfully analyzed <b>{total_sick} sick leave records</b
     st.markdown("""
     <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
         <div style="font-size:10.5px; color:#166534; font-weight:600; line-height:1.3;">
-            “Data is only useful if it helps us support our people.”
+            "Data is only useful if it helps us support our people."
         </div>
         <span style="color:#dc2626; font-size:14px; margin-left:8px;">🤍</span>
     </div>
