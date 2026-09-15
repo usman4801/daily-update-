@@ -51,7 +51,7 @@ st.markdown("""
         padding: 16px 12px !important;
     }
 
-    /* Normal Buttons (Like Quick Actions in Sidebar) */
+    /* Regular Streamlit Buttons (Like Quick Actions) */
     div.stButton > button {
         border: 1px solid #e2e8f0 !important;
         background-color: white !important;
@@ -67,53 +67,23 @@ st.markdown("""
     div.stButton > button:hover {
         border-color: #38bdf8 !important;
         background-color: #f0f9ff !important;
-        color: #0284c7 !important;
     }
 
-    /* Sidebar Buttons (Nav items) */
+    /* Sidebar Navigation Buttons */
     section[data-testid="stSidebar"] div.stButton { margin-bottom: -10px !important; }
     section[data-testid="stSidebar"] div.stButton > button { background-color: transparent !important; border: none !important; color: #94a3b8 !important; box-shadow: none !important; font-weight: 500 !important; padding: 6px 12px !important; min-height: 34px !important; border-radius: 8px !important; }
     section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1e293b !important; color: #38bdf8 !important; }
     section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
     /* =====================================================================
-       MAGIC CSS: "VIEW" BUTTON PERFECTLY INSIDE THE KPI CARD! 
+       CSS TRICK: PERFECTLY EMBEDDED BUTTONS IN KPI CARDS (NO EXTRA SPACE)
        ===================================================================== */
-    /* Target ONLY the buttons inside the 4 Top KPI Columns */
-    div[data-testid="column"] div[data-testid="column"] div.stButton > button {
-        background-color: #f0f9ff !important;
-        color: #38bdf8 !important;
-        border: 1px solid #e0f2fe !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        padding: 2px 10px !important;
-        border-radius: 12px !important;
-        min-height: 24px !important;
-        height: 24px !important;
-        width: fit-content !important;
-        margin-left: auto !important; /* Push button to right side */
-        margin-right: 15px !important;
-        margin-top: -38px !important; /* PULL IT UP INSIDE THE CARD */
-        z-index: 10 !important;
-        box-shadow: none !important;
-    }
-    div[data-testid="column"] div[data-testid="column"] div.stButton > button:hover {
-        background-color: #38bdf8 !important;
-        color: white !important;
-    }
-    /* Remove default Streamlit extra spacing below buttons */
-    div[data-testid="column"] div[data-testid="column"] div.stButton {
-        margin-bottom: 0px !important;
-        padding-bottom: 0px !important;
-    }
-    /* ===================================================================== */
-
-    /* KPI Cards Styling */
     .kpi-card { 
         background: white; 
         border: 1px solid #e2e8f0; 
         border-radius: 12px; 
         padding: 14px 16px; 
+        height: 110px; /* Fixed height so buttons align perfectly */
         margin-bottom: 0px; 
         transition: all 0.2s ease;
     }
@@ -121,10 +91,52 @@ st.markdown("""
         border-color: #38bdf8;
         box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
     }
+    
+    /* Target the button container exactly after the card */
+    div.element-container:has(.btn-pull-up) + div.element-container {
+        margin-top: -46px !important; /* Pull the button UP into the card */
+        margin-bottom: 15px !important; /* Keep layout clean */
+        height: 0px !important; /* Take ZERO physical space below card */
+        display: flex !important;
+        justify-content: flex-end !important;
+        padding-right: 15px !important;
+        position: relative !important;
+        z-index: 10 !important;
+        pointer-events: none; /* Let container ignore clicks... */
+    }
+    div.element-container:has(.btn-pull-up) + div.element-container div.stButton {
+        width: auto !important;
+        pointer-events: auto; /* ...but button catches clicks */
+    }
+    div.element-container:has(.btn-pull-up) + div.element-container div.stButton > button {
+        background-color: #f0f9ff !important;
+        color: #0284c7 !important;
+        border: 1px solid #bae6fd !important;
+        border-radius: 12px !important;
+        padding: 0px 8px !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        min-height: 24px !important;
+        height: 24px !important;
+        width: fit-content !important;
+        box-shadow: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    div.element-container:has(.btn-pull-up) + div.element-container div.stButton > button p {
+        font-size: 11px !important;
+        margin: 0 !important;
+    }
+    div.element-container:has(.btn-pull-up) + div.element-container div.stButton > button:hover {
+        background-color: #e0f2fe !important;
+        border-color: #7dd3fc !important;
+    }
+    /* ===================================================================== */
+
     .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
     .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
 
-    /* General Containers */
     .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
     .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a; }
 
@@ -333,8 +345,9 @@ with col_main:
         st.info("Please make sure 'banner.png' is in the same folder as app.py")
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-    # --- KPI Row with PERFECTLY INTEGRATED BUTTONS ---
+    # --- KPI Row with PERFECTLY INSIDE BUTTONS ---
     k1, k2, k3, k4 = st.columns(4)
+    
     with k1:
         st.markdown(f"""
         <div class="kpi-card">
@@ -344,10 +357,10 @@ with col_main:
             </div>
             <div class="kpi-val">{total_emp_count:,}</div>
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">In selected period</div>
-            <div style="height: 12px;"></div> <!-- Empty space for button -->
         </div>
+        <div class="btn-pull-up"></div>
         """, unsafe_allow_html=True)
-        # Real Streamlit button, perfectly styled inside the card
+        # Sirf "👀 View" text, automatically andar adjust ho jayega
         st.button("👀 View", key="btn_all", on_click=toggle_view, args=("Total Employees",))
         
     with k2:
@@ -359,8 +372,8 @@ with col_main:
             </div>
             <div class="kpi-val">{total_sick:,}</div>
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Total SL days</div>
-            <div style="height: 12px;"></div>
         </div>
+        <div class="btn-pull-up"></div>
         """, unsafe_allow_html=True)
         st.button("👀 View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
         
@@ -373,8 +386,8 @@ with col_main:
             </div>
             <div class="kpi-val">{one_day_events:,}</div>
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Single day leaves</div>
-            <div style="height: 12px;"></div>
         </div>
+        <div class="btn-pull-up"></div>
         """, unsafe_allow_html=True)
         st.button("👀 View", key="btn_1day", on_click=toggle_view, args=("1-Day Events",))
         
@@ -387,12 +400,12 @@ with col_main:
             </div>
             <div class="kpi-val">{two_day_events:,}</div>
             <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Consecutive leaves</div>
-            <div style="height: 12px;"></div>
         </div>
+        <div class="btn-pull-up"></div>
         """, unsafe_allow_html=True)
         st.button("👀 View", key="btn_2day", on_click=toggle_view, args=("2+ Day Events",))
 
-    # --- DYNAMIC DATA VIEWER ---
+    # --- DYNAMIC DATA VIEWER (Opens Immediately below cards) ---
     if st.session_state.active_view:
         st.markdown(f"""
         <div style="background-color: #f8fafc; border: 1px solid #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 16px; margin-top: 8px;">
