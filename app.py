@@ -185,7 +185,6 @@ def process_upl_files(dates_tuple, warehouse, exclude_str, master_roster):
 
     for d in date_list:
         d_str_tag = d.strftime('%d%m%Y')
-        # CHANGED FROM UPL TO DWD
         possible_upl_names = [
             os.path.join(warehouse, f"DWD-{warehouse}-{d_str_tag}.xlsx"),
             f"DWD-{warehouse}-{d_str_tag}.xlsx",
@@ -340,16 +339,34 @@ else:
         section[data-testid="stSidebar"] div.stButton > button:hover { color: #ffffff !important; }
         section[data-testid="stSidebar"] div.stButton:first-of-type > button { color: #ffffff !important; font-weight: 700 !important; }
         section[data-testid="stSidebar"] .nav-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #4b5768; margin: 4px 0 4px 4px; text-transform: uppercase; }
-        div.stButton > button { border: 1px solid #e2e8f0 !important; background-color: white !important; color: #1e293b !important; font-weight: 600 !important; border-radius: 8px !important; text-align: left !important; padding: 8px 12px !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; transition: all 0.2s ease-in-out !important; width: 100% !important; }
-        div.stButton > button:hover { border-color: #38bdf8 !important; background-color: #f0f9ff !important; }
-        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; height: 95px; margin-bottom: 0px; transition: all 0.2s ease; position: relative; z-index: 1; }
-        div[data-testid="column"]:has(.kpi-btn-wrapper) { position: relative !important; }
-        div[data-testid="column"]:has(.kpi-btn-wrapper):hover .kpi-card { border-color: #38bdf8; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15); }
-        div.element-container:has(.kpi-btn-wrapper) + div.element-container { position: absolute !important; inset: 0 !important; margin: 0 !important; z-index: 5 !important; }
-        div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton { width: 100% !important; height: 100% !important; }
-        div.element-container:has(.kpi-btn-wrapper) + div.element-container div.stButton > button { width: 100% !important; height: 100% !important; background: transparent !important; border: none !important; box-shadow: none !important; opacity: 0 !important; cursor: pointer !important; padding: 0 !important; margin: 0 !important; }
+        
+        /* Modern Visible Buttons */
+        div[data-testid="column"] div.stButton > button { 
+            border: 1px solid #e2e8f0 !important; 
+            background-color: white !important; 
+            color: #2563eb !important; 
+            font-weight: 700 !important; 
+            border-radius: 8px !important; 
+            text-align: center !important; 
+            padding: 4px 12px !important;
+            min-height: 30px !important;
+            height: 30px !important;
+            width: 100% !important;
+            font-size: 11.5px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; 
+            transition: all 0.2s ease-in-out !important; 
+            margin-top: -6px !important;
+        }
+        div[data-testid="column"] div.stButton > button:hover { 
+            background-color: #f0f9ff !important; 
+            border-color: #bfdbfe !important; 
+        }
+        
+        /* KPI Cards */
+        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; height: 95px; margin-bottom: 4px; position: relative; z-index: 1; }
         .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
         .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
+        
         .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
         .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a; }
         .custom-dropdown { font-size: 11px; font-weight: 600; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 6px; border-radius: 6px; outline: none; cursor: pointer; font-family: inherit; }
@@ -364,11 +381,23 @@ else:
         .ai-insight-btn:hover { transform: scale(1.03); }
         .action-link:hover { cursor: pointer; text-decoration: underline; }
         
-        /* New styling for Filter UI */
+        /* Squeezed Filter UI for single line */
         div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label, div[data-testid="stMultiSelect"] label { display: none !important; }
-        div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"], div[data-testid="stMultiSelect"] div[data-baseweb="select"] { border-radius: 16px !important; min-height: 36px !important; border: 1px solid #e2e8f0 !important; background-color: white !important; }
-        div[data-testid="stRadio"] > div { gap: 12px; }
-        div[data-testid="stRadio"] label { font-size: 11px !important; font-weight: 600 !important; color: #475569 !important; }
+        div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"], div[data-testid="stMultiSelect"] div[data-baseweb="select"] { 
+            border-radius: 10px !important; 
+            min-height: 34px !important; 
+            height: 34px !important; 
+            border: 1px solid #e2e8f0 !important; 
+            background-color: white !important; 
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+            margin-top: 2px !important;
+            margin-bottom: 2px !important;
+            padding: 2px 6px !important;
+            font-size: 11px !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -401,7 +430,7 @@ else:
         <div style="height: 20px;"></div>
         """, unsafe_allow_html=True)
         
-        if st.button("🚪 Logout", key="btn_logout"):
+        if st.sidebar.button("🚪 Logout", key="btn_logout"):
             st.session_state.logged_in = False
             st.rerun()
 
@@ -414,20 +443,19 @@ else:
         w_end = w_start + datetime.timedelta(days=6)
         weeks_dict[f"Week {w} ({w_start.strftime('%b %d')} - {w_end.strftime('%b %d')})"] = (w_start, w_end)
 
-    # --- TOP BAR WITH DUAL FILTER MODE ---
-    top_col1, top_col2, top_col3 = st.columns([1.2, 2.5, 4.8])
+    # --- SLEEK SINGLE-LINE TOP BAR ---
+    top_col1, top_col2, top_col3, top_col4 = st.columns([1, 1.2, 3.5, 3])
     
     with top_col1:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         selected_site = st.selectbox("Site", ["AUH1", "DXB", "DXB3"], label_visibility="collapsed")
         
     with top_col2:
-        filter_mode = st.radio("Mode", ["🗓️ By Week", "📅 Custom Dates"], horizontal=True, label_visibility="collapsed")
+        filter_mode = st.selectbox("Mode", ["🗓️ By Week", "📅 Custom Dates"], label_visibility="collapsed")
         
+    with top_col3:
         valid_dates_set = set()
-        
         if filter_mode == "🗓️ By Week":
-            selected_weeks_list = st.multiselect("Select Week(s)", list(weeks_dict.keys()), default=[list(weeks_dict.keys())[7]], label_visibility="collapsed")
+            selected_weeks_list = st.multiselect("Weeks", list(weeks_dict.keys()), default=[list(weeks_dict.keys())[7]], label_visibility="collapsed")
             if selected_weeks_list:
                 min_date = datetime.date(2099, 1, 1)
                 max_date = datetime.date(2000, 1, 1)
@@ -443,7 +471,7 @@ else:
                 start_date = end_date = datetime.date.today()
                 valid_dates_set.add(start_date)
         else:
-            selected_dates = st.date_input("Select Date Range", value=(base_date, base_date + datetime.timedelta(days=6)), label_visibility="collapsed")
+            selected_dates = st.date_input("Dates", value=(base_date, base_date + datetime.timedelta(days=6)), label_visibility="collapsed")
             if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
                 start_date, end_date = selected_dates
             elif isinstance(selected_dates, tuple) and len(selected_dates) == 1:
@@ -454,24 +482,22 @@ else:
             for i in range((end_date - start_date).days + 1):
                 valid_dates_set.add(start_date + datetime.timedelta(days=i))
 
-    with top_col3:
+    with top_col4:
         st.markdown("""
-        <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 32px;">
-            <span style="font-size:16px; cursor:pointer;" title="Search Employee">🔍</span>
-            <span style="font-size:12px; color:#64748b; font-weight:700; cursor:pointer;">⚡ Filters</span>
-            <span style="font-size:16px; cursor:pointer;">🔔</span>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <div style="text-align:right;">
-                    <div style="font-size:13.5px; font-weight:800; color:#0f172a; margin-top: 1px;">javmuhak</div>
-                </div>
-                <div style="width:34px; height:34px; border-radius:50%; background:#ffffff; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow: hidden;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png" style="width: 18px;">
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:16px; margin-top: 0px; height: 34px;">
+            <span style="font-size:15px; cursor:pointer;" title="Search Employee">🔍</span>
+            <span style="font-size:11.5px; color:#64748b; font-weight:700; cursor:pointer;">⚡ Filters</span>
+            <span style="font-size:15px; cursor:pointer;">🔔</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div style="font-size:13px; font-weight:800; color:#0f172a;">javmuhak</div>
+                <div style="width:28px; height:28px; border-radius:50%; background:#ffffff; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow: hidden;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png" style="width: 14px;">
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
     # Load Data and Filter by Valid Dates
     df = load_real_data(selected_site, start_date, end_date)
@@ -537,7 +563,6 @@ else:
             df_wo_linked = sick_df[sick_df['SL_Pattern'] == 'Linked to Week-Off'][['EMP Name', 'Department', 'Date', 'SL_Pattern']]
             df_consecutive = sick_df[sick_df['SL_Pattern'] == 'Consecutive SL'][['EMP Name', 'Department', 'Date', 'SL_Pattern']]
             
-            # --- THE NEW SAFE ZONE & SMART RISK RULES ---
             sl_counts = sick_df.groupby(['EMP Name', 'Department']).agg(
                 total_sl=('Date', 'count'),
                 last_date=('Date', 'max'),
@@ -545,10 +570,7 @@ else:
                 consec_count=('SL_Pattern', lambda x: (x == 'Consecutive SL').sum())
             ).reset_index()
 
-            # Rule 1: Ignore everyone who only has 1 SL (Safe Zone)
             sl_counts = sl_counts[sl_counts['total_sl'] >= 2]
-
-            # Sort the remaining ones by Risk severity
             sl_counts = sl_counts.sort_values(by=['wo_count', 'total_sl'], ascending=[False, False]).head(5)
             
             for _, row in sl_counts.iterrows():
@@ -605,9 +627,8 @@ else:
                 </div>
                 <div class="kpi-val">{total_upl_metric:,}</div>
             </div>
-            <div class="kpi-btn-wrapper"></div>
             """, unsafe_allow_html=True)
-            st.button("View", key="btn_upl", on_click=toggle_view, args=("UPL Report",))
+            st.button("👁️ View Details", key="btn_upl", on_click=toggle_view, args=("UPL Report",), use_container_width=True)
             
         with k2:
             st.markdown(f"""
@@ -618,9 +639,8 @@ else:
                 </div>
                 <div class="kpi-val">{total_sick:,}</div>
             </div>
-            <div class="kpi-btn-wrapper"></div>
             """, unsafe_allow_html=True)
-            st.button("View", key="btn_sl", on_click=toggle_view, args=("Sick Leave",))
+            st.button("👁️ View Details", key="btn_sl", on_click=toggle_view, args=("Sick Leave",), use_container_width=True)
             
         with k3:
             st.markdown(f"""
@@ -631,9 +651,8 @@ else:
                 </div>
                 <div class="kpi-val">{pattern_wo_linked:,}</div>
             </div>
-            <div class="kpi-btn-wrapper"></div>
             """, unsafe_allow_html=True)
-            st.button("View", key="btn_wo_link", on_click=toggle_view, args=("Week-Off Linked",))
+            st.button("👁️ View Details", key="btn_wo_link", on_click=toggle_view, args=("Week-Off Linked",), use_container_width=True)
             
         with k4:
             st.markdown(f"""
@@ -644,9 +663,8 @@ else:
                 </div>
                 <div class="kpi-val">{pattern_consec:,}</div>
             </div>
-            <div class="kpi-btn-wrapper"></div>
             """, unsafe_allow_html=True)
-            st.button("View", key="btn_consec", on_click=toggle_view, args=("Consecutive Events",))
+            st.button("👁️ View Details", key="btn_consec", on_click=toggle_view, args=("Consecutive Events",), use_container_width=True)
 
         if st.session_state.active_view:
             st.markdown(f"""
