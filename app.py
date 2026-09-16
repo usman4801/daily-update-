@@ -331,7 +331,9 @@ else:
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
         .stApp { background-color: #f3f6fb !important; background-image: none !important; }
-        .block-container { padding: 0.8rem 1.6rem !important; max-width: 100% !important; }
+        
+        /* REDUCED SPACING & PADDING ACROSS THE BOARD */
+        .block-container { padding: 0.4rem 1rem !important; max-width: 100% !important; }
         header[data-testid="stHeader"], [data-testid="stToolbar"] { display: none !important; }
         section[data-testid="stSidebar"] { background-color: #0b1220 !important; width: 250px !important; min-width: 250px !important; border-right: 1px solid rgba(255,255,255,0.06) !important; display: block !important; }
         section[data-testid="stSidebar"] .block-container { padding: 8px 14px !important; }
@@ -352,8 +354,8 @@ else:
             border-radius: 8px !important; 
             text-align: center !important; 
             padding: 4px 12px !important;
-            min-height: 30px !important;
-            height: 30px !important;
+            min-height: 28px !important;
+            height: 28px !important;
             width: 100% !important;
             font-size: 11.5px !important;
             box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; 
@@ -365,26 +367,26 @@ else:
             border-color: #bfdbfe !important; 
         }
         
-        /* Tiny Home Button Style */
+        /* Perfectly Aligned Tiny Home Button Style */
         .tiny-home button {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            font-size: 20px !important;
+            font-size: 18px !important;
             padding: 0 !important;
-            margin-top: -2px !important;
+            margin-top: 4px !important;
             color: #475569 !important;
             display: flex !important;
         }
         .tiny-home button:hover { background: transparent !important; transform: scale(1.1); color: #2563eb !important; }
 
         /* KPI Cards */
-        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; height: 95px; margin-bottom: 4px; position: relative; z-index: 1; }
+        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; height: 90px; margin-bottom: 4px; position: relative; z-index: 1; }
         .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
-        .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
+        .kpi-val { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
         
-        .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
-        .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #0f172a; }
+        .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; }
+        .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #0f172a; }
         .custom-dropdown { font-size: 11px; font-weight: 600; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 6px; border-radius: 6px; outline: none; cursor: pointer; font-family: inherit; }
         .custom-dropdown:hover { border-color: #cbd5e1; color: #0f172a; }
         .stDataFrame { border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
@@ -401,8 +403,8 @@ else:
         div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label, div[data-testid="stMultiSelect"] label { display: none !important; }
         div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"], div[data-testid="stMultiSelect"] div[data-baseweb="select"] { 
             border-radius: 10px !important; 
-            min-height: 34px !important; 
-            height: 34px !important; 
+            min-height: 32px !important; 
+            height: 32px !important; 
             border: 1px solid #e2e8f0 !important; 
             background-color: white !important; 
             padding-top: 0 !important;
@@ -459,7 +461,7 @@ else:
         w_end = w_start + datetime.timedelta(days=6)
         weeks_dict[f"Week {w} ({w_start.strftime('%b %d')} - {w_end.strftime('%b %d')})"] = (w_start, w_end)
 
-    # --- SLEEK SINGLE-LINE TOP BAR ---
+    # --- PERFECTLY ALIGNED SINGLE-LINE TOP BAR ---
     top_col1, top_col2, top_col3, top_col4 = st.columns([1, 1.2, 3.5, 3])
     
     with top_col1:
@@ -499,7 +501,7 @@ else:
                 valid_dates_set.add(start_date + datetime.timedelta(days=i))
 
     with top_col4:
-        c_home, c_user = st.columns([2, 8])
+        c_home, c_user = st.columns([1.5, 8.5])
         with c_home:
             st.markdown("<div class='tiny-home'>", unsafe_allow_html=True)
             if st.button("🏠", key="home_btn", help="Back to Dashboard"):
@@ -510,15 +512,15 @@ else:
         with c_user:
             username_display = st.session_state.get('username', 'javmuhak')
             st.markdown(f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; height: 34px;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; height: 32px; margin-top:2px;">
                 <div style="font-size:13px; font-weight:800; color:#0f172a; white-space:nowrap;">{username_display}</div>
-                <div style="width:28px; height:28px; border-radius:50%; background:#ffffff; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow: hidden; flex-shrink:0;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png" style="width: 14px;">
+                <div style="width:26px; height:26px; border-radius:50%; background:#ffffff; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow: hidden; flex-shrink:0;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png" style="width: 13px;">
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
     # Load Data and Filter by Valid Dates
     df = load_real_data(selected_site, start_date, end_date)
@@ -584,7 +586,6 @@ else:
         df['Next_Att'] = df.groupby('EMP Name')['Att_Clean'].shift(-1)
         
         off_tags = ['WO', 'OFF', 'DO']
-        # REQUIREMENT 1: MERGING ABWI & NCNS (AB) INTO SL
         is_sl = df['Att_Clean'].isin(['SL', 'ABWI', 'AB', 'NCNS'])
         
         is_prev_off = df['Prev_Att'].isin(off_tags)
@@ -647,7 +648,7 @@ else:
             ))
 
     chart_fig.update_layout(
-        height=200, margin=dict(l=25, r=10, t=10, b=20),
+        height=190, margin=dict(l=25, r=10, t=10, b=20),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(showgrid=False, linecolor='#e2e8f0'), yaxis=dict(showgrid=True, gridcolor='#f1f5f9', rangemode='tozero')
     )
@@ -663,7 +664,7 @@ else:
         </style>
         """, unsafe_allow_html=True)
 
-        st.markdown(f"<div style='font-size: 16px; font-weight: 700; color: #1e293b; margin-top:-10px; margin-bottom: 20px;'>📋 {st.session_state.active_view} - Detailed View:-</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 16px; font-weight: 700; color: #1e293b; margin-top:-10px; margin-bottom: 16px;'>📋 {st.session_state.active_view} - Detailed View:-</div>", unsafe_allow_html=True)
         
         if st.session_state.active_view == "UPL Report":
             if not upl_files_found:
@@ -707,7 +708,7 @@ else:
                     day_html += '<tr>'
                     hdr_colors = ['#1a237e','#1a237e','#1a237e','#0d47a1','#e65100','#e65100','#e65100','#b71c1c','#4a148c','#2e7d32','#1565c0','#4a148c','#2e7d32']
                     for idx_h, col in enumerate(display_day.columns):
-                        day_html += f'<td style="padding:6px 8px; background:{hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
+                        day_html += f'<td style="padding:5px 6px; background:{hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
                     day_html += '</tr>'
 
                     for row_idx in range(len(display_day)):
@@ -736,7 +737,7 @@ else:
                     day_html += '</table>'
                     st.markdown(day_html, unsafe_allow_html=True)
 
-                    st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
 
                     # ===== BOX 2: AGENCY WISE + BAR CHART =====
                     if all_roster_scheduled:
@@ -788,7 +789,7 @@ else:
                             ag_hdr_colors = ['#00695c','#00695c','#0d47a1','#e65100','#e65100','#e65100','#b71c1c','#2e7d32','#1565c0','#2e7d32']
                             ag_html += '<tr>'
                             for idx_h, col in enumerate(ag_cols):
-                                ag_html += f'<td style="padding:6px 8px; background:{ag_hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
+                                ag_html += f'<td style="padding:5px 6px; background:{ag_hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
                             ag_html += '</tr>'
                             for row_idx in range(len(agency_df_display)):
                                 is_total = agency_df_display.iloc[row_idx]['Agency'] == 'Total'
@@ -831,103 +832,116 @@ else:
                                 y=alt.Y('Total UPLs:Q', title='Total UPL Count', axis=alt.Axis(tickCount=5)),
                                 color=alt.Color('Agency:N', legend=None, scale=alt.Scale(domain=agency_order, range=bar_colors[:num_bars])),
                                 tooltip=['Agency', 'Total UPLs']
-                            ).properties(height=210)
+                            ).properties(height=200)
                             st.altair_chart(bar_chart, use_container_width=True)
 
-                    # ===== BOX 3: COMPACT SUMMARY (7:3 RATIO) + CLEAN PIE CHART =====
-                    st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+                    # ===== BOX 3: INDEPENDENT MULTI-WEEK WOW SUMMARY (7:3 RATIO) =====
+                    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
                     st.markdown("**Summary:-**")
 
-                    weeks_summary = {}
-                    for d, fname in upl_files_found:
-                        wk = get_week(d)
-                        if wk not in weeks_summary:
-                            weeks_summary[wk] = {'hc': 0, 'upl': 0, 'pl': 0, 'upl_target_wsum': 0.0, 'pl_target_wsum': 0.0}
-                    for row in day_wise_data:
-                        row_date_str = row['Date']
-                        row_date = None
-                        for d, fname in upl_files_found:
-                            if d.strftime('%d-%b-%y') == row_date_str:
-                                row_date = d
-                                break
-                        if row_date:
-                            wk = get_week(row_date)
-                            weeks_summary[wk]['hc'] += row['Total HC']
-                            weeks_summary[wk]['upl'] += row['Total UPLs']
-                            weeks_summary[wk]['pl'] += row['Total PLs']
-                            weeks_summary[wk]['upl_target_wsum'] += row['_UPLTargetNum'] * row['Total HC']
-                            weeks_summary[wk]['pl_target_wsum'] += row['_PLTargetNum'] * row['Total HC']
+                    # INDEPENDENT 4-WEEK FETCHING LOGIC FOR SUMMARY
+                    all_available_files = sorted(glob.glob(f"*{selected_site}*.xlsx"))
+                    summary_weeks_dict = {}
+                    for f in all_available_files:
+                        m = re.search(r'(\d{8})', f)
+                        if m:
+                            try:
+                                f_date = datetime.datetime.strptime(m.group(1), "%d%m%Y").date()
+                                wk_num = get_week(f_date)
+                                if wk_num not in summary_weeks_dict:
+                                    summary_weeks_dict[wk_num] = []
+                                summary_weeks_dict[wk_num].append((f_date, f))
+                            except: pass
+
+                    sorted_summary_weeks = sorted(summary_weeks_dict.keys())[-4:] # Last 4 active weeks automatically
 
                     sum_left, sum_right = st.columns([7, 3])
 
                     with sum_left:
-                        sorted_weeks = sorted(weeks_summary.keys())
-                        
-                        tbl = '<table style="border-collapse:collapse; width:100%; font-size:11.5px; font-family:sans-serif;">'
-                        
-                        # Header Row
-                        tbl += '<tr>'
-                        tbl += '<td style="padding:6px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Site</td>'
-                        tbl += '<td style="padding:6px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Leave Type</td>'
-                        tbl += '<td style="padding:6px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Metric</td>'
-                        for wk in sorted_weeks:
-                            tbl += f'<td style="padding:6px; background:#9b59b6; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Week {wk}</td>'
-                        tbl += '</tr>'
+                        if sorted_summary_weeks:
+                            tbl = '<table style="border-collapse:collapse; width:100%; font-size:11.5px; font-family:sans-serif;">'
+                            tbl += '<tr>'
+                            tbl += '<td style="padding:5px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Site</td>'
+                            tbl += '<td style="padding:5px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Leave Type</td>'
+                            tbl += '<td style="padding:5px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Metric</td>'
+                            for wk in sorted_summary_weeks:
+                                tbl += f'<td style="padding:5px; background:#9b59b6; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Week {wk}</td>'
+                            tbl += '</tr>'
 
-                        # Unplanned Leave (Target)
-                        tbl += '<tr>'
-                        tbl += f'<td rowspan="4" style="padding:6px; background:#c8e6c9; color:#000; font-weight:800; font-size:13px; text-align:center; border:1px solid #ddd; vertical-align:middle;">{selected_site}</td>'
-                        tbl += '<td rowspan="2" style="padding:6px; background:#fde0d0; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Unplanned Leave (UPL)</td>'
-                        tbl += '<td style="padding:6px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
-                        for wk in sorted_weeks:
-                            wk_hc_t = weeks_summary[wk]['hc']
-                            wk_upl_target = round(weeks_summary[wk]['upl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 3.50
-                            tbl += f'<td style="padding:6px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{wk_upl_target:.2f}%</td>'
-                        tbl += '</tr>'
+                            # Calculate aggregates per week dynamically
+                            w_metrics = {}
+                            for wk in sorted_summary_weeks:
+                                w_hc, w_upl, w_pl, w_upl_tsum, w_pl_tsum = 0, 0, 0, 0.0, 0.0
+                                for d_dt, f_path in summary_weeks_dict[wk]:
+                                    try:
+                                        with pd.ExcelFile(f_path) as xl:
+                                            dash = xl.parse('Dashboard', dtype=str, header=None)
+                                            rdf = xl.parse('Roster', dtype=str, header=None)
+                                        tot_hc = int(dash.iloc[8, 3])
+                                        upl_val = int(dash.iloc[8, 6])
+                                        pl_val = int(dash.iloc[8, 4])
+                                        ut, _ = parse_target_pct(safe_cell(dash, 2, 13), 3.50)
+                                        pt, _ = parse_target_pct(safe_cell(dash, 2, 14), 9.67)
+                                        w_hc += tot_hc
+                                        w_upl += upl_val
+                                        w_pl += pl_val
+                                        w_upl_tsum += ut * tot_hc
+                                        w_pl_tsum += pt * tot_hc
+                                    except: pass
+                                w_metrics[wk] = {
+                                    'hc': w_hc, 'upl': w_upl, 'pl': w_pl,
+                                    'upl_t': round(w_upl_tsum / w_hc, 2) if w_hc > 0 else 3.50,
+                                    'pl_t': round(w_pl_tsum / w_hc, 2) if w_hc > 0 else 9.67,
+                                    'upl_a': round((w_upl / w_hc) * 100, 2) if w_hc > 0 else 0.0,
+                                    'pl_a': round((w_pl / w_hc) * 100, 2) if w_hc > 0 else 0.0,
+                                }
 
-                        # Unplanned Leave (Actual)
-                        tbl += '<tr>'
-                        tbl += '<td style="padding:6px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
-                        for wk in sorted_weeks:
-                            wk_hc_t = weeks_summary[wk]['hc']
-                            wk_upl_target = round(weeks_summary[wk]['upl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 3.50
-                            wk_hc = weeks_summary[wk]['hc']
-                            wk_upl = weeks_summary[wk]['upl']
-                            wk_upl_trend = round((wk_upl / wk_hc) * 100, 2) if wk_hc > 0 else 0
-                            cell_bg = 'background:#ffcdd2;' if wk_upl_trend > wk_upl_target else 'background:#c8e6c9;'
-                            tbl += f'<td style="padding:6px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{wk_upl_trend:.2f}%</td>'
-                        tbl += '</tr>'
-                        
-                        # Planned Leave (Target)
-                        tbl += '<tr>'
-                        tbl += '<td rowspan="2" style="padding:6px; background:#e0f7fa; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Planned Leave (PL)</td>'
-                        tbl += '<td style="padding:6px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
-                        for wk in sorted_weeks:
-                            wk_hc_t = weeks_summary[wk]['hc']
-                            wk_pl_target = round(weeks_summary[wk]['pl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 9.67
-                            tbl += f'<td style="padding:6px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{wk_pl_target:.2f}%</td>'
-                        tbl += '</tr>'
+                            # UPL Target Row
+                            tbl += '<tr>'
+                            tbl += f'<td rowspan="4" style="padding:5px; background:#c8e6c9; color:#000; font-weight:800; font-size:12px; text-align:center; border:1px solid #ddd; vertical-align:middle;">{selected_site}</td>'
+                            tbl += '<td rowspan="2" style="padding:5px; background:#fde0d0; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Unplanned Leave (UPL)</td>'
+                            tbl += '<td style="padding:5px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
+                            for wk in sorted_summary_weeks:
+                                tbl += f'<td style="padding:5px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{w_metrics[wk]["upl_t"]:.2f}%</td>'
+                            tbl += '</tr>'
 
-                        # Planned Leave (Actual)
-                        tbl += '<tr>'
-                        tbl += '<td style="padding:6px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
-                        for wk in sorted_weeks:
-                            wk_hc_t = weeks_summary[wk]['hc']
-                            wk_pl_target = round(weeks_summary[wk]['pl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 9.67
-                            wk_hc = weeks_summary[wk]['hc']
-                            wk_pl = weeks_summary[wk]['pl']
-                            wk_pl_trend = round((wk_pl / wk_hc) * 100, 2) if wk_hc > 0 else 0
-                            cell_bg = 'background:#ffcdd2;' if wk_pl_trend > wk_pl_target else 'background:#c8e6c9;'
-                            tbl += f'<td style="padding:6px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{wk_pl_trend:.2f}%</td>'
-                        tbl += '</tr>'
-                        
-                        tbl += '</table>'
-                        st.markdown(tbl, unsafe_allow_html=True)
+                            # UPL Actual Row
+                            tbl += '<tr>'
+                            tbl += '<td style="padding:5px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
+                            for wk in sorted_summary_weeks:
+                                act = w_metrics[wk]["upl_a"]
+                                tgt = w_metrics[wk]["upl_t"]
+                                cell_bg = 'background:#ffcdd2;' if act > tgt else 'background:#c8e6c9;'
+                                tbl += f'<td style="padding:5px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{act:.2f}%</td>'
+                            tbl += '</tr>'
+
+                            # PL Target Row
+                            tbl += '<tr>'
+                            tbl += '<td rowspan="2" style="padding:5px; background:#e0f7fa; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Planned Leave (PL)</td>'
+                            tbl += '<td style="padding:5px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
+                            for wk in sorted_summary_weeks:
+                                tbl += f'<td style="padding:5px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{w_metrics[wk]["pl_t"]:.2f}%</td>'
+                            tbl += '</tr>'
+
+                            # PL Actual Row
+                            tbl += '<tr>'
+                            tbl += '<td style="padding:5px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
+                            for wk in sorted_summary_weeks:
+                                act = w_metrics[wk]["pl_a"]
+                                tgt = w_metrics[wk]["pl_t"]
+                                cell_bg = 'background:#ffcdd2;' if act > tgt else 'background:#c8e6c9;'
+                                tbl += f'<td style="padding:5px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{act:.2f}%</td>'
+                            tbl += '</tr>'
+
+                            tbl += '</table>'
+                            st.markdown(tbl, unsafe_allow_html=True)
+                        else:
+                            st.info("No multi-week files found for summary comparison.")
 
                     with sum_right:
                         st.markdown("**📊 PL vs UPL Share**")
-                        t_sum_upl = sum([weeks_summary[wk]['upl'] for wk in sorted_weeks])
-                        t_sum_pl = sum([weeks_summary[wk]['pl'] for wk in sorted_weeks])
+                        t_sum_upl = sum([w_metrics[wk]['upl'] for wk in sorted_summary_weeks]) if sorted_summary_weeks else 0
+                        t_sum_pl = sum([w_metrics[wk]['pl'] for wk in sorted_summary_weeks]) if sorted_summary_weeks else 0
                         
                         if t_sum_upl + t_sum_pl > 0:
                             fig_pie = go.Figure(data=[go.Pie(
@@ -939,7 +953,7 @@ else:
                                 hoverinfo='label+value'
                             )])
                             fig_pie.update_layout(
-                                height=210, 
+                                height=180, 
                                 margin=dict(l=10, r=10, t=10, b=10),
                                 paper_bgcolor='rgba(0,0,0,0)',
                                 plot_bgcolor='rgba(0,0,0,0)',
@@ -950,16 +964,10 @@ else:
                         else:
                             st.info("No Leave Data available.")
 
-                    if target_fallback_used: st.info("ℹ️ Target column not found in some DWD files — used defaults.")
-                    if upl_missing_dates: st.warning(f"⚠️ Missing DWD files for: {', '.join(upl_missing_dates)}")
-                    if upl_shift_fallback_dates: st.warning("⚠️ HC DS/NS shown from Dashboard sheet for: " + ', '.join(upl_shift_fallback_dates))
-                    if upl_error_dates: st.warning(f"⚠️ Could not read DWD file for: {', '.join(upl_error_dates)}")
-
         elif st.session_state.active_view == "Sick Leave":
             if not sick_df.empty: st.dataframe(sick_df[['EMP Name', 'Department', 'Date', 'SL_Pattern']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=400)
             else: st.info("No sick leave records found.")
         elif st.session_state.active_view == "Sick Leave Pattern":
-            # --- REQUIREMENT 4: SICK LEAVE PATTERN VIEW WITH NEAR WEEK-OFF & CONSECUTIVE DETAILS ---
             st.markdown("### 🔍 Sick Leave Pattern Analysis (Near Week-Off & Consecutive)")
             tab1, tab2 = st.tabs(["🏖️ SL Near Week-Off", "🗓️ Consecutive SL Events"])
             
@@ -983,7 +991,7 @@ else:
         with col_main:
             try: st.image("banner.png", use_container_width=True)
             except: pass 
-            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
             k1, k2, k3, k4 = st.columns(4)
             
@@ -1016,14 +1024,14 @@ else:
                 st.markdown("</div>", unsafe_allow_html=True)
                 
             with k3:
-                # REQUIREMENT 2: 3RD BOX RENAMED TO SHIFT PERFORMANCE BREAKDOWN
+                # 3RD BOX: SHIFT PERFORMANCE BREAKDOWN (WITH DEDICATED VIEW)
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
                         <span class="kpi-title">Shift Performance Breakdown</span>
                         <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
                     </div>
-                    <div style="font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
@@ -1031,7 +1039,7 @@ else:
                 st.markdown("</div>", unsafe_allow_html=True)
                 
             with k4:
-                # REQUIREMENT 2 & 3: 4TH BOX RENAMED TO SICK LEAVE PATTERN
+                # 4TH BOX: SICK LEAVE PATTERN
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
@@ -1045,7 +1053,7 @@ else:
                 st.button("👁️ View Details", key="btn_sl_pattern", on_click=toggle_view, args=("Sick Leave Pattern",), use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
             c_chart, c_insight = st.columns([6, 4])
             with c_chart:
@@ -1081,14 +1089,14 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
             rows_str = ""
             if table_data:
                 for r in table_data:
                     rows_str += f"<tr><td><b>{r['name']}</b></td><td style='color:#64748b;'>{r['dept']}</td><td style='color:#475569; font-weight:600;'>{r['pattern']}</td><td style='text-align:center;'>{r['events']}</td><td style='color:#64748b;'>{r['date']}</td><td><span class='risk-badge' style='background:{r['bg']}; color:{r['color']};'>{r['risk']}</span></td><td><a href='#' class='action-link' style='color:#2563eb; font-weight:700; text-decoration:none;'>View →</a></td></tr>"
             else:
-                rows_str = "<tr><td colspan='7' style='text-align:center; color:#64748b; padding: 24px;'>✅ No suspicious patterns (2+ SLs) found in selected range.</td></tr>"
+                rows_str = "<tr><td colspan='7' style='text-align:center; color:#64748b; padding: 20px;'>✅ No suspicious patterns (2+ SLs) found in selected range.</td></tr>"
                 
             st.markdown(f"""
             <div class="content-box">
@@ -1103,22 +1111,22 @@ else:
             """, unsafe_allow_html=True)
 
         with col_side:
-            st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
+            st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 18px; color: white; margin-bottom: 10px; position: relative; overflow: hidden;">
         <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;"><span style="font-size:14px;">🤖</span> AI ASSISTANT</div>
-        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:15px; top:22px; width:80px; z-index: 1; opacity: 0.95;">
-        <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0; position: relative; z-index: 2;">Range Analyzed!</div>
-        <div style="font-size:13px; line-height:1.5; opacity:0.95; width:65%; margin-bottom:20px; position: relative; z-index: 2;">
+        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:12px; top:18px; width:75px; z-index: 1; opacity: 0.95;">
+        <div style="font-weight:800; font-size:17px; margin: 6px 0 12px 0; position: relative; z-index: 2;">Range Analyzed!</div>
+        <div style="font-size:12.5px; line-height:1.4; opacity:0.95; width:65%; margin-bottom:16px; position: relative; z-index: 2;">
         Hi PXT! 👋<br>I've filtered out single absences. Focus on the table for employees needing coaching or Medical Certs.
         </div>
         <a href="#" class="ai-insight-btn" onclick="alert('Generating Coaching templates...');">Start Coaching →</a>
         </div>""", unsafe_allow_html=True)
 
-            st.markdown("""<div class="content-box" style="margin-bottom: 12px; padding: 10px 14px;"><div style="font-weight: 700; font-size: 12.5px; color: #0f172a; margin-bottom: 8px;">⚡ Quick Actions</div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="content-box" style="margin-bottom: 10px; padding: 10px 14px;"><div style="font-weight: 700; font-size: 12.5px; color: #0f172a; margin-bottom: 6px;">⚡ Quick Actions</div>""", unsafe_allow_html=True)
             if st.button("📥 Export High-Risk CSV", use_container_width=True): st.success("✅ Risk Report Exported as CSV!")
             if st.button("📝 Generate Coaching File", use_container_width=True): st.success("✅ Coaching template created successfully!")
             st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown("""<div class="content-box" style="margin-bottom: 12px;"><div class="box-header">📊 Range SL Breakdown</div>""", unsafe_allow_html=True)
+            st.markdown("""<div class="content-box" style="margin-bottom: 10px;"><div class="box-header">📊 Range SL Breakdown</div>""", unsafe_allow_html=True)
             
             if total_sick > 0:
                 normal_sl = total_sick - pattern_wo_linked - pattern_consec
@@ -1128,7 +1136,7 @@ else:
                     hole=.72,
                     marker=dict(colors=['#0ea5e9', '#8b5cf6', '#cbd5e1']), textinfo='none'
                 )])
-                fig_donut.update_layout(height=150, margin=dict(l=5, r=5, t=5, b=5), showlegend=False, annotations=[dict(text=f'<b>{total_sick}</b><br><span style="font-size:9px; color:#64748b;">Total SL</span>', x=0.5, y=0.5, font_size=14, showarrow=False)])
+                fig_donut.update_layout(height=140, margin=dict(l=5, r=5, t=5, b=5), showlegend=False, annotations=[dict(text=f'<b>{total_sick}</b><br><span style="font-size:9px; color:#64748b;">Total SL</span>', x=0.5, y=0.5, font_size=14, showarrow=False)])
                 st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
                 st.markdown(f"""
                     <div style="font-size:10.5px; color:#475569; margin-top:2px;">
@@ -1137,7 +1145,7 @@ else:
                     </div></div>
                 """, unsafe_allow_html=True)
             else:
-                 st.markdown("<div style='text-align:center; padding: 20px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
+                 st.markdown("<div style='text-align:center; padding: 15px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
 
             st.markdown("""
             <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
