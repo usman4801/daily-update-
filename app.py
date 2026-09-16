@@ -525,7 +525,7 @@ else:
     if not df.empty:
         df = df[df['Date'].isin(valid_dates_set)]
 
-    # --- PROCESS UPL REPORT DATA (DWD FILES) GLOBALLY ---
+    # --- PROCESS UPL/DWD DATA GLOBALLY ---
     with st.spinner("Processing Data Metrics..."):
         (
             day_wise_data,
@@ -549,6 +549,32 @@ else:
     table_data = []
     chart_fig = go.Figure()
 
+    # --- SHIFT PERFORMANCE CALCULATION (3RD BOX LOGIC) ---
+    day_shift_hc = 0
+    night_shift_hc = 0
+    day_shift_present = 0
+    night_shift_present = 0
+
+    if day_wise_data:
+        for r in day_wise_data:
+            day_shift_hc += r.get('HC DS', 0)
+            night_shift_hc += r.get('HC NS', 0)
+            
+    if all_roster_scheduled:
+        combined_sched = pd.concat(all_roster_scheduled, ignore_index=True)
+        shift_col_found = find_column(combined_sched, ['shift', 'schedule', 'work shift'])
+        if shift_col_found:
+            combined_sched['Shift_Class'] = classify_shift_series(combined_sched[shift_col_found])
+            ds_df = combined_sched[combined_sched['Shift_Class'] == 'DS']
+            ns_df = combined_sched[combined_sched['Shift_Class'] == 'NS']
+            
+            day_shift_present = len(ds_df[ds_df['Attendance'] == 'P'])
+            night_shift_present = len(ns_df[ns_df['Attendance'] == 'P'])
+
+    day_perf_pct = round((day_shift_present / day_shift_hc) * 100, 1) if day_shift_hc > 0 else 0.0
+    night_perf_pct = round((night_shift_present / night_shift_hc) * 100, 1) if night_shift_hc > 0 else 0.0
+    shift_perf_display = f"DS: {day_perf_pct}% | NS: {night_perf_pct}%"
+
     if not df.empty:
         total_emp_count = df['EMP Name'].nunique()
         df['Att_Clean'] = df['Attendance'].astype(str).str.strip().str.upper()
@@ -558,11 +584,13 @@ else:
         df['Next_Att'] = df.groupby('EMP Name')['Att_Clean'].shift(-1)
         
         off_tags = ['WO', 'OFF', 'DO']
-        is_sl = df['Att_Clean'] == 'SL'
+        # REQUIREMENT 1: MERGING ABWI & NCNS (AB) INTO SL
+        is_sl = df['Att_Clean'].isin(['SL', 'ABWI', 'AB', 'NCNS'])
+        
         is_prev_off = df['Prev_Att'].isin(off_tags)
         is_next_off = df['Next_Att'].isin(off_tags)
-        is_prev_sl = df['Prev_Att'] == 'SL'
-        is_next_sl = df['Next_Att'] == 'SL'
+        is_prev_sl = df['Prev_Att'].isin(['SL', 'ABWI', 'AB', 'NCNS'])
+        is_next_sl = df['Next_Att'].isin(['SL', 'ABWI', 'AB', 'NCNS'])
         
         df['SL_Pattern'] = 'Mid-Week Normal SL'
         df.loc[is_sl & (is_prev_off | is_next_off), 'SL_Pattern'] = 'Linked to Week-Off'
@@ -930,12 +958,21 @@ else:
         elif st.session_state.active_view == "Sick Leave":
             if not sick_df.empty: st.dataframe(sick_df[['EMP Name', 'Department', 'Date', 'SL_Pattern']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=400)
             else: st.info("No sick leave records found.")
-        elif st.session_state.active_view == "Week-Off Linked":
-            if not df_wo_linked.empty: st.dataframe(df_wo_linked.reset_index(drop=True), use_container_width=True, height=400)
-            else: st.info("No Week-Off linked SL found.")
-        elif st.session_state.active_view == "Consecutive Events":
-            if not df_consecutive.empty: st.dataframe(df_consecutive.reset_index(drop=True), use_container_width=True, height=400)
-            else: st.info("No consecutive sick leave events found.")
+        elif st.session_state.active_view == "Sick Leave Pattern":
+            # --- REQUIREMENT 4: SICK LEAVE PATTERN VIEW WITH NEAR WEEK-OFF & CONSECUTIVE DETAILS ---
+            st.markdown("### 🔍 Sick Leave Pattern Analysis (Near Week-Off & Consecutive)")
+            tab1, tab2 = st.tabs(["🏖️ SL Near Week-Off", "🗓️ Consecutive SL Events"])
+            
+            with tab1:
+                if not df_wo_linked.empty:
+                    st.dataframe(df_wo_linked.reset_index(drop=True), use_container_width=True, height=400)
+                else:
+                    st.info("No Week-Off linked SL found for selected range.")
+            with tab2:
+                if not df_consecutive.empty:
+                    st.dataframe(df_consecutive.reset_index(drop=True), use_container_width=True, height=400)
+                else:
+                    st.info("No consecutive sick leave events found for selected range.")
 
     # ==========================================
     # MAIN DASHBOARD VIEW (WHEN NO DETAIL IS SELECTED)
@@ -979,31 +1016,33 @@ else:
                 st.markdown("</div>", unsafe_allow_html=True)
                 
             with k3:
+                # REQUIREMENT 2: 3RD BOX RENAMED TO SHIFT PERFORMANCE BREAKDOWN
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">SL near Week-Off</span>
-                        <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">🏖️</span>
+                        <span class="kpi-title">Shift Performance Breakdown</span>
+                        <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
                     </div>
-                    <div class="kpi-val">{pattern_wo_linked:,}</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_wo_link", on_click=toggle_view, args=("Week-Off Linked",), use_container_width=True)
+                st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("UPL Report",), use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
                 
             with k4:
+                # REQUIREMENT 2 & 3: 4TH BOX RENAMED TO SICK LEAVE PATTERN
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Consecutive SL</span>
+                        <span class="kpi-title">Sick Leave Pattern</span>
                         <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
                     </div>
-                    <div class="kpi-val">{pattern_consec:,}</div>
+                    <div class="kpi-val">{pattern_wo_linked + pattern_consec:,}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_consec", on_click=toggle_view, args=("Consecutive Events",), use_container_width=True)
+                st.button("👁️ View Details", key="btn_sl_pattern", on_click=toggle_view, args=("Sick Leave Pattern",), use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
