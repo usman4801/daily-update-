@@ -27,7 +27,7 @@ def toggle_view(view_name):
 
 
 # ==========================================
-#              1. LOGIN PAGE (FIXED)
+#              1. LOGIN PAGE (FIXED - NO PASSWORD)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
@@ -121,15 +121,14 @@ if not st.session_state.logged_in:
             """, unsafe_allow_html=True)
             
             username = st.text_input("Amazon Login ID", placeholder="e.g. javmuhak")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
             
             submitted = st.form_submit_button("Sign In")
             if submitted:
-                if username and password:
+                if username:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Please enter both Login ID and Password.")
+                    st.error("Please enter your Login ID.")
 
         st.markdown("""
             <div style="text-align: center; color: #cbd5e1; font-size: 11.5px; margin-top: 20px;">
@@ -457,7 +456,8 @@ else:
                     <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
                 </div>
                 <div class="kpi-val">{total_emp_count:,}</div>
-                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                    <span style="font-size:10px; color:#94a3b8;">In selected period</span>
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
@@ -473,7 +473,8 @@ else:
                     <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
                 </div>
                 <div class="kpi-val">{total_sick:,}</div>
-                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                    <span style="font-size:10px; color:#94a3b8;">Total SL days</span>
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
@@ -489,7 +490,8 @@ else:
                     <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
                 </div>
                 <div class="kpi-val">{one_day_events:,}</div>
-                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                    <span style="font-size:10px; color:#94a3b8;">Single day leaves</span>
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
@@ -505,7 +507,8 @@ else:
                     <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
                 </div>
                 <div class="kpi-val">{two_day_events:,}</div>
-                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
+                    <span style="font-size:10px; color:#94a3b8;">Consecutive leaves</span>
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
