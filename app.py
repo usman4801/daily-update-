@@ -161,8 +161,12 @@ else:
         .ai-insight-btn { background: white; color: #2563eb; border-radius: 8px; padding: 10px 16px; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 2; text-decoration: none; transition: transform 0.1s; }
         .ai-insight-btn:hover { transform: scale(1.03); }
         .action-link:hover { cursor: pointer; text-decoration: underline; }
-        div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label { display: none !important; }
-        div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"] { border-radius: 20px !important; min-height: 36px !important; height: 36px !important; border: 1px solid #e2e8f0 !important; background-color: white !important; }
+        
+        /* New styling for Filter UI */
+        div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label, div[data-testid="stMultiSelect"] label { display: none !important; }
+        div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"], div[data-testid="stMultiSelect"] div[data-baseweb="select"] { border-radius: 16px !important; min-height: 36px !important; border: 1px solid #e2e8f0 !important; background-color: white !important; }
+        div[data-testid="stRadio"] > div { gap: 12px; }
+        div[data-testid="stRadio"] label { font-size: 11px !important; font-weight: 600 !important; color: #475569 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -199,27 +203,58 @@ else:
             st.session_state.logged_in = False
             st.rerun()
 
-    # --- WEEK CALENDAR LOGIC PREPARATION ---
-    # Generating Amazon Weeks dynamically based on Week 37 = Sept 6 to Sept 12
+    # --- CALENDAR PREPARATION ---
     base_date = datetime.date(2026, 9, 6) # Start of Week 37
     weeks_dict = {}
-    # Generate weeks from 30 to 45 for dropdown
     for w in range(30, 46):
         delta_days = (w - 37) * 7
         w_start = base_date + datetime.timedelta(days=delta_days)
         w_end = w_start + datetime.timedelta(days=6)
         weeks_dict[f"Week {w} ({w_start.strftime('%b %d')} - {w_end.strftime('%b %d')})"] = (w_start, w_end)
 
-    top_col1, top_col2, top_col3 = st.columns([1.2, 2.3, 5.0])
+    # --- TOP BAR WITH DUAL FILTER MODE ---
+    top_col1, top_col2, top_col3 = st.columns([1.2, 2.5, 4.8])
+    
     with top_col1:
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         selected_site = st.selectbox("Site", ["AUH1", "DXB", "DXB3"], label_visibility="collapsed")
+        
     with top_col2:
-        # Changed from Date Picker to Week Dropdown
-        selected_week_str = st.selectbox("Select Week", list(weeks_dict.keys()), index=7, label_visibility="collapsed") 
-        start_date, end_date = weeks_dict[selected_week_str]
+        filter_mode = st.radio("Mode", ["🗓️ By Week", "📅 Custom Dates"], horizontal=True, label_visibility="collapsed")
+        
+        valid_dates_set = set()
+        
+        if filter_mode == "🗓️ By Week":
+            selected_weeks_list = st.multiselect("Select Week(s)", list(weeks_dict.keys()), default=[list(weeks_dict.keys())[7]], label_visibility="collapsed")
+            if selected_weeks_list:
+                min_date = datetime.date(2099, 1, 1)
+                max_date = datetime.date(2000, 1, 1)
+                for w in selected_weeks_list:
+                    w_s, w_e = weeks_dict[w]
+                    min_date = min(min_date, w_s)
+                    max_date = max(max_date, w_e)
+                    for i in range((w_e - w_s).days + 1):
+                        valid_dates_set.add(w_s + datetime.timedelta(days=i))
+                start_date = min_date
+                end_date = max_date
+            else:
+                start_date = end_date = datetime.date.today()
+                valid_dates_set.add(start_date)
+        else:
+            selected_dates = st.date_input("Select Date Range", value=(base_date, base_date + datetime.timedelta(days=6)), label_visibility="collapsed")
+            if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
+                start_date, end_date = selected_dates
+            elif isinstance(selected_dates, tuple) and len(selected_dates) == 1:
+                start_date = end_date = selected_dates[0]
+            else:
+                start_date = end_date = datetime.date.today()
+            
+            for i in range((end_date - start_date).days + 1):
+                valid_dates_set.add(start_date + datetime.timedelta(days=i))
+
     with top_col3:
         st.markdown("""
-        <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 2px;">
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:18px; margin-top: 32px;">
             <span style="font-size:16px; cursor:pointer;" title="Search Employee">🔍</span>
             <span style="font-size:12px; color:#64748b; font-weight:700; cursor:pointer;">⚡ Filters</span>
             <span style="font-size:16px; cursor:pointer;">🔔</span>
@@ -236,7 +271,10 @@ else:
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
+    # Load Data and Filter by Valid Dates
     df = load_real_data(selected_site, start_date, end_date)
+    if not df.empty:
+        df = df[df['Date'].isin(valid_dates_set)]
 
     total_emp_count = 0
     total_sick = 0
@@ -302,19 +340,18 @@ else:
                 wo_c = row['wo_count']
                 consec_c = row['consec_count']
                 
-                # Apply rules for people with 2+ SLs
                 if wo_c >= 1:
                     risk = "High Risk"
                     pattern_text = f"🚨 {wo_c}x SL near Week-Off"
-                    bg, color = "#fee2e2", "#dc2626" # Red
+                    bg, color = "#fee2e2", "#dc2626"
                 elif consec_c >= 1:
                     risk = "Pending Medical"
                     pattern_text = f"🏥 Consecutive SL ({total} days)"
-                    bg, color = "#e0f2fe", "#0284c7" # Blue
+                    bg, color = "#e0f2fe", "#0284c7"
                 else:
                     risk = "Medium Risk"
                     pattern_text = f"⚠️ {total}x Isolated SL"
-                    bg, color = "#fef3c7", "#d97706" # Yellow
+                    bg, color = "#fef3c7", "#d97706"
                 
                 table_data.append({
                     "name": row['EMP Name'], "dept": row['Department'] if pd.notna(row['Department']) else "Unknown",
@@ -344,7 +381,6 @@ else:
         k1, k2, k3, k4 = st.columns(4)
         
         with k1:
-            # UPDATED KPI CARD: UPL Report (Empty for now)
             st.markdown(f"""
             <div class="kpi-card">
                 <div style="display:flex; justify-content:space-between;">
@@ -461,7 +497,7 @@ else:
             for r in table_data:
                 rows_str += f"<tr><td><b>{r['name']}</b></td><td style='color:#64748b;'>{r['dept']}</td><td style='color:#475569; font-weight:600;'>{r['pattern']}</td><td style='text-align:center;'>{r['events']}</td><td style='color:#64748b;'>{r['date']}</td><td><span class='risk-badge' style='background:{r['bg']}; color:{r['color']};'>{r['risk']}</span></td><td><a href='#' class='action-link' style='color:#2563eb; font-weight:700; text-decoration:none;'>View →</a></td></tr>"
         else:
-            rows_str = "<tr><td colspan='7' style='text-align:center; color:#64748b; padding: 24px;'>✅ No suspicious patterns (2+ SLs) found for this week.</td></tr>"
+            rows_str = "<tr><td colspan='7' style='text-align:center; color:#64748b; padding: 24px;'>✅ No suspicious patterns (2+ SLs) found in selected range.</td></tr>"
             
         st.markdown(f"""
         <div class="content-box">
@@ -479,7 +515,7 @@ else:
         st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 20px; color: white; margin-bottom: 12px; position: relative; overflow: hidden;">
     <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;"><span style="font-size:14px;">🤖</span> AI ASSISTANT</div>
     <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:15px; top:22px; width:80px; z-index: 1; opacity: 0.95;">
-    <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0; position: relative; z-index: 2;">Week Analyzed!</div>
+    <div style="font-weight:800; font-size:18px; margin: 8px 0 16px 0; position: relative; z-index: 2;">Range Analyzed!</div>
     <div style="font-size:13px; line-height:1.5; opacity:0.95; width:65%; margin-bottom:20px; position: relative; z-index: 2;">
     Hi PXT! 👋<br>I've filtered out single absences. Focus on the table for employees needing coaching or Medical Certs.
     </div>
@@ -491,7 +527,7 @@ else:
         if st.button("📝 Generate Coaching File", use_container_width=True): st.success("✅ Coaching template created successfully!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("""<div class="content-box" style="margin-bottom: 12px;"><div class="box-header">📊 Weekly SL Type Breakdown</div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="content-box" style="margin-bottom: 12px;"><div class="box-header">📊 Range SL Breakdown</div>""", unsafe_allow_html=True)
         
         if total_sick > 0:
             normal_sl = total_sick - pattern_wo_linked - pattern_consec
@@ -510,7 +546,7 @@ else:
                 </div></div>
             """, unsafe_allow_html=True)
         else:
-             st.markdown("<div style='text-align:center; padding: 20px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data this week</div></div>", unsafe_allow_html=True)
+             st.markdown("<div style='text-align:center; padding: 20px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
 
         st.markdown("""
         <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
