@@ -365,23 +365,18 @@ else:
             border-color: #bfdbfe !important; 
         }
         
-        /* Home Button Container Style */
-        .home-btn-container button {
+        /* Tiny Home Button Style */
+        .tiny-home button {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            color: #475569 !important;
-            font-weight: 700 !important;
-            font-size: 13.5px !important;
+            font-size: 20px !important;
             padding: 0 !important;
+            margin-top: -2px !important;
+            color: #475569 !important;
             display: flex !important;
-            justify-content: flex-end !important;
-            margin-top: 3px !important;
         }
-        .home-btn-container button:hover {
-            color: #2563eb !important;
-            background: transparent !important;
-        }
+        .tiny-home button:hover { background: transparent !important; transform: scale(1.1); color: #2563eb !important; }
 
         /* KPI Cards */
         .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; height: 95px; margin-bottom: 4px; position: relative; z-index: 1; }
@@ -504,19 +499,19 @@ else:
                 valid_dates_set.add(start_date + datetime.timedelta(days=i))
 
     with top_col4:
-        # CLEANED TOP RIGHT: Removed filters/bell/search, Added dynamic Home button and Username
-        h_col, u_col = st.columns([4, 6])
-        with h_col:
-            st.markdown("<div class='home-btn-container'>", unsafe_allow_html=True)
-            if st.button("🏠 Home", use_container_width=True):
+        # CLEANED TOP RIGHT: Just Home Icon and Username
+        c_home, c_user = st.columns([2, 8])
+        with c_home:
+            st.markdown("<div class='tiny-home'>", unsafe_allow_html=True)
+            if st.button("🏠", key="home_btn", help="Back to Dashboard"):
                 st.session_state.active_view = None
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
             
-        with u_col:
+        with c_user:
             username_display = st.session_state.get('username', 'javmuhak')
             st.markdown(f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; height: 34px; margin-top:2px;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; height: 34px;">
                 <div style="font-size:13px; font-weight:800; color:#0f172a; white-space:nowrap;">{username_display}</div>
                 <div style="width:28px; height:28px; border-radius:50%; background:#ffffff; border: 1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow: hidden; flex-shrink:0;">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png" style="width: 14px;">
@@ -643,8 +638,7 @@ else:
         """, unsafe_allow_html=True)
 
         # --- FULL WIDTH DETAILED PAGE (Removed Box & Replaced Title) ---
-        st.markdown(f"**📋 {st.session_state.active_view} - Detailed View:-**")
-        st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 16px; font-weight: 700; color: #1e293b; margin-top:-10px; margin-bottom: 20px;'>📋 {st.session_state.active_view} - Detailed View:-</div>", unsafe_allow_html=True)
         
         if st.session_state.active_view == "UPL Report":
             if not upl_files_found:
@@ -719,7 +713,7 @@ else:
 
                     st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
 
-                    # ===== BOX 2: AGENCY WISE + BAR CHART =====
+                    # ===== BOX 2: AGENCY WISE + COMPACT BAR CHART =====
                     if all_roster_scheduled:
                         combined_roster = pd.concat(all_roster_scheduled, ignore_index=True)
                         combined_roster['3P'] = combined_roster['3P'].replace('QuessCorp', 'Quesscorp')
@@ -760,7 +754,7 @@ else:
                         }])
                         agency_df_display = pd.concat([agency_df_display, ag_total_row], ignore_index=True)
 
-                        ag_left, ag_right = st.columns([5.5, 4.5])
+                        ag_left, ag_right = st.columns([6.8, 3.2])
 
                         with ag_left:
                             st.markdown("**Agency wise:-**")
@@ -773,7 +767,7 @@ else:
                             ag_html += '</tr>'
                             for row_idx in range(len(agency_df_display)):
                                 is_total = agency_df_display.iloc[row_idx]['Agency'] == 'Total'
-                                bg = '#fff9c4' if is_total else ('#f1f8e9' if row_idx % 2 == 0 else '#ffffff')
+                                bg = '#fff9c4' if is_total else ('#f8f9fa' if row_idx % 2 == 0 else '#ffffff')
                                 fw = '700' if is_total else '500'
                                 ag_html += f'<tr style="background:{bg};">'
                                 for col in ag_cols:
@@ -806,16 +800,16 @@ else:
                             agency_order = chart_data['Agency'].tolist()
 
                             bar_chart = alt.Chart(chart_data).mark_bar(
-                                cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=28,
+                                cornerRadiusTopLeft=4, cornerRadiusTopRight=4, size=24,
                             ).encode(
-                                x=alt.X('Agency:N', sort=agency_order, axis=alt.Axis(labelAngle=-45, labelFontSize=10)),
-                                y=alt.Y('Total UPLs:Q', title='Total UPL Count'),
+                                x=alt.X('Agency:N', sort=agency_order, axis=alt.Axis(labelAngle=-45, labelFontSize=10, title=None)),
+                                y=alt.Y('Total UPLs:Q', title='Total UPL Count', axis=alt.Axis(tickCount=5)),
                                 color=alt.Color('Agency:N', legend=None, scale=alt.Scale(domain=agency_order, range=bar_colors[:num_bars])),
                                 tooltip=['Agency', 'Total UPLs']
-                            ).properties(height=260)
+                            ).properties(height=210)
                             st.altair_chart(bar_chart, use_container_width=True)
 
-                    # ===== BOX 3: NEW SMART COMPACT SUMMARY + TREND CHART =====
+                    # ===== BOX 3: COMPACT SUMMARY (MATCHING SCREENSHOT) + PIE CHART =====
                     st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
                     st.markdown("**Summary:-**")
 
@@ -839,7 +833,7 @@ else:
                             weeks_summary[wk]['upl_target_wsum'] += row['_UPLTargetNum'] * row['Total HC']
                             weeks_summary[wk]['pl_target_wsum'] += row['_PLTargetNum'] * row['Total HC']
 
-                    sum_left, sum_right = st.columns([5.5, 4.5])
+                    sum_left, sum_right = st.columns([6.8, 3.2])
 
                     with sum_left:
                         sorted_weeks = sorted(weeks_summary.keys())
@@ -853,18 +847,18 @@ else:
                         tbl += '<td style="padding:6px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Leave Type</td>'
                         tbl += '<td style="padding:6px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Metric</td>'
                         for wk in sorted_weeks:
-                            tbl += f'<td style="padding:6px; background:#00695c; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Week {wk}</td>'
+                            tbl += f'<td style="padding:6px; background:#9b59b6; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Week {wk}</td>'
                         tbl += '</tr>'
 
                         # Unplanned Leave (Target)
                         tbl += '<tr>'
-                        tbl += f'<td rowspan="4" style="padding:6px; background:#f8f9fa; font-weight:800; font-size:13px; text-align:center; border:1px solid #ddd; vertical-align:middle;">{selected_site}</td>'
-                        tbl += '<td rowspan="2" style="padding:6px; background:#fde0d0; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Unplanned Leave (UPL)</td>'
+                        tbl += f'<td rowspan="4" style="padding:6px; background:#c8e6c9; color:#000; font-weight:800; font-size:13px; text-align:center; border:1px solid #ddd; vertical-align:middle;">{selected_site}</td>'
+                        tbl += '<td rowspan="2" style="padding:6px; background:#fde0d0; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Unplanned Leave (UPL)</td>'
                         tbl += '<td style="padding:6px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
                         for wk in sorted_weeks:
                             wk_hc_t = weeks_summary[wk]['hc']
                             wk_upl_target = round(weeks_summary[wk]['upl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 3.50
-                            tbl += f'<td style="padding:6px; text-align:center; border:1px solid #ddd; font-weight:600;">{wk_upl_target:.2f}%</td>'
+                            tbl += f'<td style="padding:6px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{wk_upl_target:.2f}%</td>'
                         tbl += '</tr>'
 
                         # Unplanned Leave (Actual)
@@ -882,12 +876,12 @@ else:
                         
                         # Planned Leave (Target)
                         tbl += '<tr>'
-                        tbl += '<td rowspan="2" style="padding:6px; background:#e0f7fa; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Planned Leave (PL)</td>'
+                        tbl += '<td rowspan="2" style="padding:6px; background:#e0f7fa; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Planned Leave (PL)</td>'
                         tbl += '<td style="padding:6px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
                         for wk in sorted_weeks:
                             wk_hc_t = weeks_summary[wk]['hc']
                             wk_pl_target = round(weeks_summary[wk]['pl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 9.67
-                            tbl += f'<td style="padding:6px; text-align:center; border:1px solid #ddd; font-weight:600;">{wk_pl_target:.2f}%</td>'
+                            tbl += f'<td style="padding:6px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{wk_pl_target:.2f}%</td>'
                         tbl += '</tr>'
 
                         # Planned Leave (Actual)
@@ -907,54 +901,29 @@ else:
                         st.markdown(tbl, unsafe_allow_html=True)
 
                     with sum_right:
-                        num_weeks = len(sorted_weeks)
-                        if num_weeks == 1:
-                            wk = sorted_weeks[0]
-                            wk_hc = weeks_summary[wk]['hc']
-                            wk_upl_trend = round((weeks_summary[wk]['upl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
-                            wk_pl_trend = round((weeks_summary[wk]['pl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
-                            wk_label = f'Week {wk}'
-                            week_order = [' ', wk_label, '  ']
-                            chart_rows = []
-                            for lbl in week_order:
-                                chart_rows.append({'Week': lbl, 'Metric': 'Unplanned Leave', 'Actual %': wk_upl_trend})
-                                chart_rows.append({'Week': lbl, 'Metric': 'Planned Leave', 'Actual %': wk_pl_trend})
-                            trend_df = pd.DataFrame(chart_rows)
-                            label_df = trend_df[trend_df['Week'] == wk_label]
+                        st.markdown("**📊 PL vs UPL Share**")
+                        
+                        t_sum_upl = sum([weeks_summary[wk]['upl'] for wk in sorted_weeks])
+                        t_sum_pl = sum([weeks_summary[wk]['pl'] for wk in sorted_weeks])
+                        
+                        if t_sum_upl + t_sum_pl > 0:
+                            fig_pie = go.Figure(data=[go.Pie(
+                                labels=['Unplanned (UPL)', 'Planned (PL)'],
+                                values=[t_sum_upl, t_sum_pl],
+                                hole=0.6,
+                                marker=dict(colors=['#f97316', '#3b82f6']),
+                                textinfo='percent',
+                                hoverinfo='label+value'
+                            )])
+                            fig_pie.update_layout(
+                                height=200, 
+                                margin=dict(l=10, r=10, t=10, b=10),
+                                showlegend=True,
+                                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                            )
+                            st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
                         else:
-                            week_order = [f'Week {wk}' for wk in sorted_weeks]
-                            chart_rows = []
-                            for wk in sorted_weeks:
-                                wk_hc = weeks_summary[wk]['hc']
-                                wk_upl_trend = round((weeks_summary[wk]['upl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
-                                wk_pl_trend = round((weeks_summary[wk]['pl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
-                                wk_label = f'Week {wk}'
-                                chart_rows.append({'Week': wk_label, 'Metric': 'Unplanned Leave', 'Actual %': wk_upl_trend})
-                                chart_rows.append({'Week': wk_label, 'Metric': 'Planned Leave', 'Actual %': wk_pl_trend})
-                            trend_df = pd.DataFrame(chart_rows)
-                            label_df = trend_df
-
-                        metric_colors = alt.Scale(domain=['Planned Leave', 'Unplanned Leave'], range=['#3b82f6', '#f97316'])
-
-                        base = alt.Chart(trend_df).encode(
-                            x=alt.X('Week:N', sort=week_order, title=None, axis=alt.Axis(domain=True, ticks=True, grid=False)),
-                        )
-
-                        trend_area = base.mark_area(line={'strokeWidth': 2.5}, opacity=0.35, interpolate='monotone').encode(
-                            y=alt.Y('Actual %:Q', title='Actual %', axis=alt.Axis(domain=True, ticks=True, grid=True)),
-                            color=alt.Color('Metric:N', scale=metric_colors, legend=alt.Legend(orient='bottom', labelFontSize=11, labelFontWeight='bold', title=None)),
-                            detail='Metric:N', tooltip=['Week', 'Metric', 'Actual %']
-                        )
-
-                        trend_points = alt.Chart(label_df).mark_point(filled=True, size=70, stroke='white', strokeWidth=1.5).encode(
-                            x=alt.X('Week:N', sort=week_order), y=alt.Y('Actual %:Q'), color=alt.Color('Metric:N', scale=metric_colors, legend=None), detail='Metric:N',
-                        )
-
-                        trend_labels = alt.Chart(label_df).mark_text(dy=-12, fontSize=10, fontWeight='bold').encode(
-                            x=alt.X('Week:N', sort=week_order), y=alt.Y('Actual %:Q'), text=alt.Text('Actual %:Q', format='.2f'), color=alt.Color('Metric:N', scale=metric_colors, legend=None), detail='Metric:N',
-                        )
-
-                        st.altair_chart((trend_area + trend_points + trend_labels).properties(height=180), use_container_width=True)
+                            st.info("No Leave Data available to plot.")
 
                     if target_fallback_used: st.info("ℹ️ Target column not found in some DWD files — used defaults.")
                     if upl_missing_dates: st.warning(f"⚠️ Missing DWD files for: {', '.join(upl_missing_dates)}")
