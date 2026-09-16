@@ -499,7 +499,6 @@ else:
                 valid_dates_set.add(start_date + datetime.timedelta(days=i))
 
     with top_col4:
-        # CLEANED TOP RIGHT: Just Home Icon and Username
         c_home, c_user = st.columns([2, 8])
         with c_home:
             st.markdown("<div class='tiny-home'>", unsafe_allow_html=True)
@@ -629,7 +628,6 @@ else:
     # ROUTING: SHOW DETAILS PAGE OR MAIN DASHBOARD
     # ==========================================
     if st.session_state.active_view is not None:
-        # --- AUTO HIDE SIDEBAR ON DETAILS VIEW FOR FULL SCREEN WIDTH ---
         st.markdown("""
         <style>
             [data-testid="stSidebar"] { display: none !important; }
@@ -637,7 +635,6 @@ else:
         </style>
         """, unsafe_allow_html=True)
 
-        # --- FULL WIDTH DETAILED PAGE (Removed Box & Replaced Title) ---
         st.markdown(f"<div style='font-size: 16px; font-weight: 700; color: #1e293b; margin-top:-10px; margin-bottom: 20px;'>📋 {st.session_state.active_view} - Detailed View:-</div>", unsafe_allow_html=True)
         
         if st.session_state.active_view == "UPL Report":
@@ -713,7 +710,7 @@ else:
 
                     st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
 
-                    # ===== BOX 2: AGENCY WISE + COMPACT BAR CHART =====
+                    # ===== BOX 2: AGENCY WISE + BAR CHART =====
                     if all_roster_scheduled:
                         combined_roster = pd.concat(all_roster_scheduled, ignore_index=True)
                         combined_roster['3P'] = combined_roster['3P'].replace('QuessCorp', 'Quesscorp')
@@ -754,7 +751,7 @@ else:
                         }])
                         agency_df_display = pd.concat([agency_df_display, ag_total_row], ignore_index=True)
 
-                        ag_left, ag_right = st.columns([6.8, 3.2])
+                        ag_left, ag_right = st.columns([6.2, 3.8])
 
                         with ag_left:
                             st.markdown("**Agency wise:-**")
@@ -767,7 +764,7 @@ else:
                             ag_html += '</tr>'
                             for row_idx in range(len(agency_df_display)):
                                 is_total = agency_df_display.iloc[row_idx]['Agency'] == 'Total'
-                                bg = '#fff9c4' if is_total else ('#f8f9fa' if row_idx % 2 == 0 else '#ffffff')
+                                bg = '#fff9c4' if is_total else ('#f1f8e9' if row_idx % 2 == 0 else '#ffffff')
                                 fw = '700' if is_total else '500'
                                 ag_html += f'<tr style="background:{bg};">'
                                 for col in ag_cols:
@@ -809,7 +806,7 @@ else:
                             ).properties(height=210)
                             st.altair_chart(bar_chart, use_container_width=True)
 
-                    # ===== BOX 3: COMPACT SUMMARY (MATCHING SCREENSHOT) + PIE CHART =====
+                    # ===== BOX 3: COMPACT SUMMARY (7:3 RATIO) + CLEAN PIE CHART =====
                     st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
                     st.markdown("**Summary:-**")
 
@@ -833,12 +830,11 @@ else:
                             weeks_summary[wk]['upl_target_wsum'] += row['_UPLTargetNum'] * row['Total HC']
                             weeks_summary[wk]['pl_target_wsum'] += row['_PLTargetNum'] * row['Total HC']
 
-                    sum_left, sum_right = st.columns([6.8, 3.2])
+                    sum_left, sum_right = st.columns([7, 3])
 
                     with sum_left:
                         sorted_weeks = sorted(weeks_summary.keys())
                         
-                        # --- THE NEW COMPACT MULTI-WEEK SUMMARY TABLE ---
                         tbl = '<table style="border-collapse:collapse; width:100%; font-size:11.5px; font-family:sans-serif;">'
                         
                         # Header Row
@@ -902,7 +898,6 @@ else:
 
                     with sum_right:
                         st.markdown("**📊 PL vs UPL Share**")
-                        
                         t_sum_upl = sum([weeks_summary[wk]['upl'] for wk in sorted_weeks])
                         t_sum_pl = sum([weeks_summary[wk]['pl'] for wk in sorted_weeks])
                         
@@ -916,14 +911,16 @@ else:
                                 hoverinfo='label+value'
                             )])
                             fig_pie.update_layout(
-                                height=200, 
+                                height=210, 
                                 margin=dict(l=10, r=10, t=10, b=10),
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)',
                                 showlegend=True,
-                                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5)
                             )
                             st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
                         else:
-                            st.info("No Leave Data available to plot.")
+                            st.info("No Leave Data available.")
 
                     if target_fallback_used: st.info("ℹ️ Target column not found in some DWD files — used defaults.")
                     if upl_missing_dates: st.warning(f"⚠️ Missing DWD files for: {', '.join(upl_missing_dates)}")
