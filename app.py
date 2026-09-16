@@ -374,8 +374,9 @@ else:
             padding: 6px 16px !important;
             border: none !important;
             margin-bottom: 15px !important;
+            transition: all 0.2s ease;
         }
-        .btn-back button:hover { background-color: #1e293b !important; }
+        .btn-back button:hover { background-color: #1e293b !important; transform: translateX(-2px); }
 
         /* KPI Cards */
         .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; height: 95px; margin-bottom: 4px; position: relative; z-index: 1; }
@@ -622,6 +623,14 @@ else:
     # ROUTING: SHOW DETAILS PAGE OR MAIN DASHBOARD
     # ==========================================
     if st.session_state.active_view is not None:
+        # --- AUTO HIDE SIDEBAR ON DETAILS VIEW FOR FULL SCREEN WIDTH ---
+        st.markdown("""
+        <style>
+            [data-testid="stSidebar"] { display: none !important; }
+            section[data-testid="stSidebar"] { display: none !important; }
+        </style>
+        """, unsafe_allow_html=True)
+
         # --- FULL WIDTH DETAILED PAGE ---
         st.markdown("<div class='btn-back'>", unsafe_allow_html=True)
         st.button("⬅️ Back to Dashboard", on_click=go_back)
@@ -793,7 +802,7 @@ else:
                             agency_order = chart_data['Agency'].tolist()
 
                             bar_chart = alt.Chart(chart_data).mark_bar(
-                                cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=35,
+                                cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=28,
                             ).encode(
                                 x=alt.X('Agency:N', sort=agency_order, axis=alt.Axis(labelAngle=-45, labelFontSize=11)),
                                 y=alt.Y('Total UPLs:Q', title='Total UPL Count'),
