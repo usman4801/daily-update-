@@ -6,6 +6,9 @@ import os
 import datetime
 import re
 import numpy as np
+import base64
+import altair as alt
+from datetime import timedelta
 
 # 1. Page Configuration
 st.set_page_config(
@@ -20,7 +23,7 @@ if 'logged_in' not in st.session_state:
 if 'active_view' not in st.session_state:
     st.session_state.active_view = None
 
-# 3. Global Functions
+# 3. Global Functions & UPL/DWD Helpers
 def toggle_view(view_name):
     if st.session_state.active_view == view_name:
         st.session_state.active_view = None 
@@ -67,6 +70,205 @@ def load_real_data(site, start_d, end_d):
     if dfs:
         return pd.concat(dfs, ignore_index=True)
     return pd.DataFrame()
+
+# --- UPL/DWD Report Helper Functions ---
+WEEK_ANCHOR_DATE = datetime.date(2026, 8, 2)
+WEEK_ANCHOR_NUM = 32
+
+def get_week(d):
+    if hasattr(d, 'date'): d = d.date()
+    delta = (d - WEEK_ANCHOR_DATE).days
+    return WEEK_ANCHOR_NUM + delta // 7
+
+def clean_id(val):
+    try: return str(int(float(val))).strip()
+    except Exception: return str(val).strip().lower()
+
+def normalize_col(c):
+    return (str(c).strip().lower().replace("_", " ").replace("-", " ").replace(".", " "))
+
+def safe_cell(df, row, col):
+    try:
+        val = df.iloc[row, col]
+        if pd.isna(val): return None
+        return val
+    except Exception: return None
+
+def parse_target_pct(val, default):
+    if val is None: return default, False
+    try:
+        s = str(val).strip().replace('%', '')
+        if s == '' or s.lower() in ['nan', 'none']: return default, False
+        return round(float(s), 2), True
+    except Exception: return default, False
+
+def parse_roster_target_pct(val, default):
+    if val is None: return default, False
+    try:
+        s = str(val).strip().replace('%', '')
+        if s == '' or s.lower() in ['nan', 'none']: return default, False
+        f = float(s)
+        if abs(f) < 1: f *= 100
+        return round(f, 2), True
+    except Exception: return default, False
+
+def find_column(df, keywords):
+    if df.empty: return None
+    for col in df.columns:
+        nc = normalize_col(col)
+        for keyword in keywords:
+            if keyword in nc: return col
+    return None
+
+def classify_shift_series(shift_series):
+    day_tokens = ('ds', 'day', 'morning', '1st', 'am shift', 'general')
+    night_tokens = ('ns', 'night', 'evening', '2nd', 'pm shift', 'graveyard')
+    def _classify(v):
+        s = str(v).strip().lower()
+        if not s or s == 'nan': return ''
+        if s in ('d', 'am'): return 'DS'
+        if s in ('n', 'pm'): return 'NS'
+        for tok in day_tokens:
+            if tok in s: return 'DS'
+        for tok in night_tokens:
+            if tok in s: return 'NS'
+        return ''
+    return shift_series.apply(_classify)
+
+@st.cache_data(show_spinner=False)
+def load_permanent_roster():
+    roster = pd.DataFrame()
+    possible_files = [os.path.join("AUH1", "HC.xlsx"), os.path.join("AUH1", "hc.xlsx"), "HC.xlsx", "hc.xlsx", "HC.XLSX", "hc.XLSX"]
+    for filename in possible_files:
+        if os.path.exists(filename):
+            try:
+                roster = pd.read_excel(filename, dtype=str)
+                break
+            except Exception: continue
+    if roster.empty: return roster
+    roster.columns = [str(c).strip() for c in roster.columns]
+    id_col = None
+    for c in roster.columns:
+        nc = normalize_col(c)
+        if nc in ["id", "employee id", "employee no", "employee number", "psoft id", "psoft", "emp id", "emp no"] or "employee id" in nc or "psoft" in nc:
+            id_col = c
+            break
+    if id_col is None: id_col = roster.columns[0]
+    roster["_Clean_ID"] = roster[id_col].apply(clean_id)
+    return roster
+
+def get_roster_master(roster):
+    if roster.empty: return pd.DataFrame()
+    result = roster.copy()
+    id_col = None
+    for col in result.columns:
+        nc = normalize_col(col)
+        if "employee id" in nc or "psoft" in nc or nc in ["id", "emp id", "employee no", "employee number"]:
+            id_col = col
+            break
+    if id_col is None: id_col = result.columns[0]
+    result["_Clean_ID"] = result[id_col].apply(clean_id)
+    return result
+
+roster_df = load_permanent_roster()
+roster_master = get_roster_master(roster_df)
+
+@st.cache_data(show_spinner=False)
+def process_upl_files(dates_tuple, warehouse, exclude_str, master_roster):
+    start_d, end_d = dates_tuple
+    exclude_list = [clean_id(x) for x in exclude_str.split(",") if str(x).strip()] if exclude_str else []
+    date_list = [start_d + timedelta(days=i) for i in range((end_d - start_d).days + 1)]
+    
+    upl_files_found, upl_missing_dates, upl_error_dates, upl_shift_fallback_dates = [], [], [], []
+    day_wise_data, all_roster_scheduled = [], []
+    target_fallback_used = False
+
+    for d in date_list:
+        d_str_tag = d.strftime('%d%m%Y')
+        # CHANGED FROM UPL TO DWD
+        possible_upl_names = [
+            os.path.join(warehouse, f"DWD-{warehouse}-{d_str_tag}.xlsx"),
+            f"DWD-{warehouse}-{d_str_tag}.xlsx",
+            os.path.join(warehouse, f"DWD-{warehouse}-{d.strftime('%Y-%m-%d')}.xlsx"),
+            f"DWD-{warehouse}-{d.strftime('%Y-%m-%d')}.xlsx"
+        ]
+        file_path = next((p for p in possible_upl_names if os.path.exists(p)), None)
+        if not file_path:
+            upl_missing_dates.append(d.strftime("%d-%b-%y"))
+            continue
+        try:
+            with pd.ExcelFile(file_path) as xl:
+                dash = xl.parse('Dashboard', dtype=str, header=None)
+                rdf = xl.parse('Roster', dtype=str, header=None)
+
+            hc_ds, hc_ns, total_hc = int(dash.iloc[5, 3]), int(dash.iloc[7, 3]), int(dash.iloc[8, 3])
+            sl, ab_abwi = int(dash.iloc[27, 7]), int(dash.iloc[27, 8])
+            upl_total, pl_total = int(dash.iloc[8, 6]), int(dash.iloc[8, 4])
+
+            upl_target_val, upl_target_found = parse_target_pct(safe_cell(dash, 2, 13), 3.50)
+            pl_target_val, pl_target_found = parse_target_pct(safe_cell(dash, 2, 14), 9.67)
+
+            roster_pl_target_val, roster_pl_target_found = parse_roster_target_pct(safe_cell(rdf, 0, 6), pl_target_val)
+            if roster_pl_target_found:
+                pl_target_val = roster_pl_target_val
+                pl_target_found = True
+
+            if not upl_target_found or not pl_target_found:
+                target_fallback_used = True
+
+            roster = rdf.iloc[6:].copy()
+            roster.columns = [str(c).strip() for c in rdf.iloc[5].tolist()]
+            roster['_Clean_ID'] = roster['Psoft No'].apply(clean_id)
+
+            if 'Building' in roster.columns: roster = roster[roster['Building'] == warehouse]
+            if exclude_list: roster = roster[~roster['_Clean_ID'].isin(exclude_list)]
+            if 'Type' in roster.columns: roster = roster[roster['Type'] == 'Direct']
+            if '3P' in roster.columns: roster['3P'] = roster['3P'].replace('QuessCorp', 'Quesscorp')
+
+            scheduled = roster[(roster['Attendance'] != 'OFF') & (roster['Attendance'].notna()) & (roster['Attendance'].astype(str).str.strip() != '')].copy()
+
+            abwi_count = len(scheduled[scheduled['Attendance'] == 'ABWI'])
+            ab_count = len(scheduled[scheduled['Attendance'] == 'AB'])
+            sl_from_roster = len(scheduled[scheduled['Attendance'] == 'SL'])
+            pl_from_roster = len(scheduled[scheduled['Attendance'] == 'PL'])
+            upl_from_roster = sl_from_roster + ab_count + abwi_count
+            hc_from_roster = len(scheduled)
+
+            shift_col = find_column(scheduled, ['shift', 'schedule', 'work shift', 'shift code'])
+            hc_ds_roster = hc_ns_roster = None
+            if shift_col:
+                shift_class = classify_shift_series(scheduled[shift_col])
+                unclassified = int((shift_class == '').sum())
+                if unclassified == 0:
+                    hc_ds_roster = int((shift_class == 'DS').sum())
+                    hc_ns_roster = int((shift_class == 'NS').sum())
+
+            if hc_ds_roster is not None and hc_ds_roster + hc_ns_roster == hc_from_roster:
+                day_hc_ds, day_hc_ns, day_shift_source = hc_ds_roster, hc_ns_roster, 'roster'
+            else:
+                day_hc_ds, day_hc_ns, day_shift_source = hc_ds, hc_ns, 'dashboard'
+
+            if day_shift_source == 'dashboard' and hc_from_roster != total_hc:
+                upl_shift_fallback_dates.append(d.strftime('%d-%b-%y'))
+
+            scheduled['_date'] = d.strftime('%d-%b-%y')
+            all_roster_scheduled.append(scheduled)
+
+            upl_trend = round((upl_from_roster / hc_from_roster) * 100, 2) if hc_from_roster > 0 else 0
+            pl_trend = round((pl_from_roster / hc_from_roster) * 100, 2) if hc_from_roster > 0 else 0
+
+            day_wise_data.append({
+                'Date': d.strftime('%d-%b-%y'), 'HC DS': day_hc_ds, 'HC NS': day_hc_ns, 'Total HC': hc_from_roster,
+                'SL': sl_from_roster, 'AB': ab_count, 'ABWI': abwi_count, 'Total UPLs': upl_from_roster,
+                'Target': f'{upl_target_val:.2f}%', 'Trend': f'{upl_trend:.2f}%', 'Total PLs': pl_from_roster,
+                'Target ': f'{pl_target_val:.2f}%', 'Trend ': f'{pl_trend:.2f}%',
+                '_UPLTargetNum': upl_target_val, '_PLTargetNum': pl_target_val, '_UPLTrendNum': upl_trend, '_PLTrendNum': pl_trend,
+            })
+            upl_files_found.append((d, file_path))
+        except Exception:
+            upl_error_dates.append(d.strftime('%d-%b-%y'))
+
+    return (day_wise_data, all_roster_scheduled, upl_files_found, upl_missing_dates, upl_error_dates, upl_shift_fallback_dates, target_fallback_used)
 
 
 # ==========================================
@@ -276,6 +478,20 @@ else:
     if not df.empty:
         df = df[df['Date'].isin(valid_dates_set)]
 
+    # --- PROCESS UPL REPORT DATA (DWD FILES) BEFORE KPI CARDS ---
+    with st.spinner("Processing DWD/UPL metrics..."):
+        (
+            day_wise_data,
+            all_roster_scheduled,
+            upl_files_found,
+            upl_missing_dates,
+            upl_error_dates,
+            upl_shift_fallback_dates,
+            target_fallback_used
+        ) = process_upl_files((start_date, end_date), selected_site, "", roster_master)
+
+    total_upl_metric = sum([r['Total UPLs'] for r in day_wise_data]) if day_wise_data else 0
+
     total_emp_count = 0
     total_sick = 0
     pattern_wo_linked = 0
@@ -387,7 +603,7 @@ else:
                     <span class="kpi-title">UPL Report</span>
                     <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">📉</span>
                 </div>
-                <div class="kpi-val">-</div>
+                <div class="kpi-val">{total_upl_metric:,}</div>
             </div>
             <div class="kpi-btn-wrapper"></div>
             """, unsafe_allow_html=True)
@@ -441,7 +657,302 @@ else:
             """, unsafe_allow_html=True)
             
             if st.session_state.active_view == "UPL Report":
-                st.info("UPL Report module is currently under development. Data will be fetched soon.")
+                if not upl_files_found:
+                    st.warning(f"⚠️ No DWD files found for selected dates in {selected_site}. Expected format: DWD-{selected_site}-DDMMYYYY.xlsx")
+                else:
+                    if day_wise_data:
+                        day_df = pd.DataFrame(day_wise_data)
+
+                        t_hc_ds = day_df['HC DS'].sum()
+                        t_hc_ns = day_df['HC NS'].sum()
+                        t_hc = day_df['Total HC'].sum()
+                        t_sl = day_df['SL'].sum()
+                        t_ab = day_df['AB'].sum()
+                        t_abwi = day_df['ABWI'].sum()
+                        t_upl = day_df['Total UPLs'].sum()
+                        t_pl = day_df['Total PLs'].sum()
+                        t_upl_trend = round((t_upl / t_hc) * 100, 2) if t_hc > 0 else 0
+                        t_pl_trend = round((t_pl / t_hc) * 100, 2) if t_hc > 0 else 0
+
+                        t_upl_target = round((day_df['_UPLTargetNum'] * day_df['Total HC']).sum() / t_hc, 2) if t_hc > 0 else 3.50
+                        t_pl_target = round((day_df['_PLTargetNum'] * day_df['Total HC']).sum() / t_hc, 2) if t_hc > 0 else 9.67
+
+                        week_no = get_week(upl_files_found[0][0])
+
+                        # ===== BOX 1: DAY WISE =====
+                        st.markdown("**Day wise:-**")
+
+                        display_day = day_df[['Date','HC DS','HC NS','Total HC','SL','AB','ABWI','Total UPLs','Target','Trend','Total PLs','Target ','Trend ']].copy()
+                        total_row_df = pd.DataFrame([{
+                            'Date': 'Total', 'HC DS': t_hc_ds, 'HC NS': t_hc_ns, 'Total HC': t_hc,
+                            'SL': t_sl, 'AB': t_ab, 'ABWI': t_abwi, 'Total UPLs': t_upl,
+                            'Target': f'{t_upl_target:.2f}%', 'Trend': f'{t_upl_trend:.2f}%',
+                            'Total PLs': t_pl, 'Target ': f'{t_pl_target:.2f}%', 'Trend ': f'{t_pl_trend:.2f}%',
+                        }])
+                        display_day = pd.concat([display_day, total_row_df], ignore_index=True)
+
+                        row_upl_targets = list(day_df['_UPLTargetNum']) + [t_upl_target]
+                        row_pl_targets = list(day_df['_PLTargetNum']) + [t_pl_target]
+
+                        day_html = '<table style="border-collapse:collapse; width:100%; font-size:11px; font-family:sans-serif;">'
+                        day_html += '<tr>'
+                        hdr_colors = ['#1a237e','#1a237e','#1a237e','#0d47a1','#e65100','#e65100','#e65100','#b71c1c','#4a148c','#2e7d32','#1565c0','#4a148c','#2e7d32']
+                        for idx_h, col in enumerate(display_day.columns):
+                            day_html += f'<td style="padding:5px 8px; background:{hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
+                        day_html += '</tr>'
+
+                        for row_idx in range(len(display_day)):
+                            is_total = display_day.iloc[row_idx]['Date'] == 'Total'
+                            bg = '#fff9c4' if is_total else ('#f8f9fa' if row_idx % 2 == 0 else '#ffffff')
+                            fw = '700' if is_total else '500'
+                            day_html += f'<tr style="background:{bg};">'
+                            for col in display_day.columns:
+                                val = display_day.iloc[row_idx][col]
+                                cell_bg = ''
+                                cell_color = '#000'
+                                if col == 'Trend' and not is_total:
+                                    try:
+                                        trend_val = float(str(val).replace('%',''))
+                                        row_target = row_upl_targets[row_idx]
+                                        cell_bg = 'background:#ffcdd2;' if trend_val > row_target else 'background:#c8e6c9;'
+                                    except: pass
+                                if col == 'Trend ' and not is_total:
+                                    try:
+                                        trend_val = float(str(val).replace('%',''))
+                                        row_target = row_pl_targets[row_idx]
+                                        cell_bg = 'background:#ffcdd2;' if trend_val > row_target else 'background:#c8e6c9;'
+                                    except: pass
+                                day_html += f'<td style="padding:4px 8px; text-align:center; border:1px solid #ddd; font-weight:{fw}; {cell_bg} color:{cell_color}; white-space:nowrap;">{val}</td>'
+                            day_html += '</tr>'
+                        day_html += '</table>'
+                        st.markdown(day_html, unsafe_allow_html=True)
+
+                        st.markdown("<div style='margin-top:18px;'></div>", unsafe_allow_html=True)
+
+                        # ===== BOX 2: AGENCY WISE + BAR CHART =====
+                        if all_roster_scheduled:
+                            combined_roster = pd.concat(all_roster_scheduled, ignore_index=True)
+                            combined_roster['3P'] = combined_roster['3P'].replace('QuessCorp', 'Quesscorp')
+
+                            agency_data = []
+                            for agency in sorted(combined_roster['3P'].dropna().unique()):
+                                ag = combined_roster[combined_roster['3P'] == agency]
+                                ag_hc = len(ag)
+                                ag_sl = len(ag[ag['Attendance'] == 'SL'])
+                                ag_abwi = len(ag[ag['Attendance'] == 'ABWI'])
+                                ag_ab = len(ag[ag['Attendance'] == 'AB'])
+                                ag_upl = ag_sl + ag_abwi + ag_ab
+                                ag_pl = len(ag[ag['Attendance'] == 'PL'])
+                                ag_upl_trend = round((ag_upl / ag_hc) * 100, 2) if ag_hc > 0 else 0
+                                ag_pl_trend = round((ag_pl / ag_hc) * 100, 2) if ag_hc > 0 else 0
+
+                                agency_data.append({
+                                    'Agency': agency, 'Week No': week_no, 'Total HC': ag_hc,
+                                    'SL': ag_sl, 'ABWI': ag_abwi, 'NCNS': ag_ab, 'Total UPLs': ag_upl,
+                                    'Trend': f'{ag_upl_trend:.2f}%', 'Total PLs': ag_pl, 'PL Trend': f'{ag_pl_trend:.2f}%',
+                                })
+
+                            agency_df_display = pd.DataFrame(agency_data)
+
+                            ag_t_hc = agency_df_display['Total HC'].sum()
+                            ag_t_sl = agency_df_display['SL'].sum()
+                            ag_t_abwi = agency_df_display['ABWI'].sum()
+                            ag_t_ncns = agency_df_display['NCNS'].sum()
+                            ag_t_upl = agency_df_display['Total UPLs'].sum()
+                            ag_t_pl = agency_df_display['Total PLs'].sum()
+                            ag_t_upl_trend = round((ag_t_upl / ag_t_hc) * 100, 2) if ag_t_hc > 0 else 0
+                            ag_t_pl_trend = round((ag_t_pl / ag_t_hc) * 100, 2) if ag_t_hc > 0 else 0
+
+                            ag_total_row = pd.DataFrame([{
+                                'Agency': 'Total', 'Week No': week_no, 'Total HC': ag_t_hc,
+                                'SL': ag_t_sl, 'ABWI': ag_t_abwi, 'NCNS': ag_t_ncns, 'Total UPLs': ag_t_upl,
+                                'Trend': f'{ag_t_upl_trend:.2f}%', 'Total PLs': ag_t_pl, 'PL Trend': f'{ag_t_pl_trend:.2f}%',
+                            }])
+                            agency_df_display = pd.concat([agency_df_display, ag_total_row], ignore_index=True)
+
+                            ag_left, ag_right = st.columns([6, 4])
+
+                            with ag_left:
+                                st.markdown("**Agency wise:-**")
+                                ag_html = '<table style="border-collapse:collapse; width:100%; font-size:11px; font-family:sans-serif;">'
+                                ag_cols = ['Agency','Week No','Total HC','SL','ABWI','NCNS','Total UPLs','Trend','Total PLs','PL Trend']
+                                ag_hdr_colors = ['#00695c','#00695c','#0d47a1','#e65100','#e65100','#e65100','#b71c1c','#2e7d32','#1565c0','#2e7d32']
+                                ag_html += '<tr>'
+                                for idx_h, col in enumerate(ag_cols):
+                                    ag_html += f'<td style="padding:5px 6px; background:{ag_hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
+                                ag_html += '</tr>'
+                                for row_idx in range(len(agency_df_display)):
+                                    is_total = agency_df_display.iloc[row_idx]['Agency'] == 'Total'
+                                    bg = '#fff9c4' if is_total else ('#f1f8e9' if row_idx % 2 == 0 else '#ffffff')
+                                    fw = '700' if is_total else '500'
+                                    ag_html += f'<tr style="background:{bg};">'
+                                    for col in ag_cols:
+                                        val = agency_df_display.iloc[row_idx][col]
+                                        cell_bg = ''
+                                        if col == 'Trend' and not is_total:
+                                            try:
+                                                tv = float(str(val).replace('%',''))
+                                                cell_bg = 'background:#ffcdd2;' if tv > 3.50 else 'background:#c8e6c9;'
+                                            except: pass
+                                        if col == 'PL Trend' and not is_total:
+                                            try:
+                                                tv = float(str(val).replace('%',''))
+                                                cell_bg = 'background:#ffcdd2;' if tv > 7.16 else 'background:#c8e6c9;'
+                                            except: pass
+                                        ag_html += f'<td style="padding:4px 6px; text-align:center; border:1px solid #ddd; font-weight:{fw}; {cell_bg} white-space:nowrap;">{val}</td>'
+                                    ag_html += '</tr>'
+                                ag_html += '</table>'
+                                st.markdown(ag_html, unsafe_allow_html=True)
+
+                            with ag_right:
+                                st.markdown("#### 📊 Agency UPL Share")
+                                chart_data = agency_df_display[agency_df_display['Agency'] != 'Total'][['Agency', 'Total UPLs']].copy()
+                                chart_data = chart_data.sort_values('Total UPLs', ascending=False).reset_index(drop=True)
+
+                                gradient_colors = ['#b71c1c', '#e53935', '#f57c00', '#fdd835', '#81c784', '#2e7d32']
+                                num_bars = len(chart_data)
+                                bar_colors = gradient_colors[:num_bars] if num_bars <= len(gradient_colors) else gradient_colors
+                                chart_data['Color'] = bar_colors[:num_bars]
+                                agency_order = chart_data['Agency'].tolist()
+
+                                bar_chart = alt.Chart(chart_data).mark_bar(
+                                    cornerRadiusTopLeft=6, cornerRadiusTopRight=6, size=28,
+                                ).encode(
+                                    x=alt.X('Agency:N', sort=agency_order, axis=alt.Axis(labelAngle=-45, labelFontSize=10)),
+                                    y=alt.Y('Total UPLs:Q', title='Total UPL Count'),
+                                    color=alt.Color('Agency:N', legend=None, scale=alt.Scale(domain=agency_order, range=bar_colors[:num_bars])),
+                                    tooltip=['Agency', 'Total UPLs']
+                                ).properties(height=320)
+                                st.altair_chart(bar_chart, use_container_width=True)
+
+                        # ===== BOX 3: SUMMARY + TREND CHART =====
+                        st.markdown("<div style='margin-top:15px;'></div>", unsafe_allow_html=True)
+                        st.markdown("**Summary:-**")
+
+                        weeks_summary = {}
+                        for d, fname in upl_files_found:
+                            wk = get_week(d)
+                            if wk not in weeks_summary:
+                                weeks_summary[wk] = {'hc': 0, 'upl': 0, 'pl': 0, 'upl_target_wsum': 0.0, 'pl_target_wsum': 0.0}
+                        for row in day_wise_data:
+                            row_date_str = row['Date']
+                            row_date = None
+                            for d, fname in upl_files_found:
+                                if d.strftime('%d-%b-%y') == row_date_str:
+                                    row_date = d
+                                    break
+                            if row_date:
+                                wk = get_week(row_date)
+                                weeks_summary[wk]['hc'] += row['Total HC']
+                                weeks_summary[wk]['upl'] += row['Total UPLs']
+                                weeks_summary[wk]['pl'] += row['Total PLs']
+                                weeks_summary[wk]['upl_target_wsum'] += row['_UPLTargetNum'] * row['Total HC']
+                                weeks_summary[wk]['pl_target_wsum'] += row['_PLTargetNum'] * row['Total HC']
+
+                        sum_left, sum_right = st.columns([6, 4])
+
+                        with sum_left:
+                            sorted_weeks = sorted(weeks_summary.keys())
+                            num_weeks = len(sorted_weeks)
+
+                            tbl = '<table style="border-collapse:collapse; width:100%; font-size:13px; font-weight:600; border:2px solid #000;">'
+                            tbl += '<tr style="background:#b0c4de; text-align:center;"><td colspan="' + str(num_weeks + 2) + '" style="padding:8px; border:2px solid #000; font-size:15px; font-weight:800;">UPL Trend</td></tr>'
+                            tbl += '<tr style="background:#fde0d0; text-align:center;"><td colspan="' + str(num_weeks + 2) + '" style="padding:6px; border:2px solid #000; font-weight:700; font-size:14px;">Unplanned Leave</td></tr>'
+                            tbl += '<tr style="text-align:center;"><td style="padding:8px; border:2px solid #000; background:#c8e6c9; font-weight:700; font-size:14px;" rowspan="3">' + selected_site + '</td>'
+                            tbl += '<td style="padding:6px; border:2px solid #000;"></td>'
+                            for wk in sorted_weeks:
+                                tbl += '<td style="padding:6px 10px; border:2px solid #000; background:#9b59b6; color:white; font-weight:700;">Week ' + str(wk) + '</td>'
+                            tbl += '</tr>'
+                            tbl += '<tr style="text-align:center;"><td style="padding:7px; border:2px solid #000; font-weight:700;">Target</td>'
+                            for wk in sorted_weeks:
+                                wk_hc_t = weeks_summary[wk]['hc']
+                                wk_upl_target = round(weeks_summary[wk]['upl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 3.50
+                                tbl += '<td style="padding:7px; border:2px solid #000; background:#2e7d32; color:white; font-weight:700;">' + f'{wk_upl_target:.2f}' + '%</td>'
+                            tbl += '</tr>'
+                            tbl += '<tr style="text-align:center;"><td style="padding:7px; border:2px solid #000; font-weight:700;">Actual</td>'
+                            for wk in sorted_weeks:
+                                wk_hc = weeks_summary[wk]['hc']
+                                wk_upl = weeks_summary[wk]['upl']
+                                wk_upl_trend = round((wk_upl / wk_hc) * 100, 2) if wk_hc > 0 else 0
+                                tbl += '<td style="padding:7px; border:2px solid #000; background:#f1c40f; color:#000; font-weight:700;">' + str(wk_upl_trend) + '%</td>'
+                            tbl += '</tr>'
+                            
+                            tbl += '<tr style="background:#fde0d0; text-align:center;"><td colspan="' + str(num_weeks + 2) + '" style="padding:6px; border:2px solid #000; font-weight:700; font-size:14px;">Planned Leave</td></tr>'
+                            tbl += '<tr style="text-align:center;"><td style="padding:8px; border:2px solid #000; background:#c8e6c9; font-weight:700; font-size:14px;" rowspan="3">' + selected_site + '</td>'
+                            tbl += '<td style="padding:6px; border:2px solid #000;"></td>'
+                            for wk in sorted_weeks:
+                                tbl += '<td style="padding:6px 10px; border:2px solid #000; background:#9b59b6; color:white; font-weight:700;">Week ' + str(wk) + '</td>'
+                            tbl += '</tr>'
+                            tbl += '<tr style="text-align:center;"><td style="padding:7px; border:2px solid #000; font-weight:700;">Target</td>'
+                            for wk in sorted_weeks:
+                                wk_hc_t = weeks_summary[wk]['hc']
+                                wk_pl_target = round(weeks_summary[wk]['pl_target_wsum'] / wk_hc_t, 2) if wk_hc_t > 0 else 9.67
+                                tbl += '<td style="padding:7px; border:2px solid #000; background:#2e7d32; color:white; font-weight:700;">' + f'{wk_pl_target:.2f}' + '%</td>'
+                            tbl += '</tr>'
+                            tbl += '<tr style="text-align:center;"><td style="padding:7px; border:2px solid #000; font-weight:700;">Actual</td>'
+                            for wk in sorted_weeks:
+                                wk_hc = weeks_summary[wk]['hc']
+                                wk_pl = weeks_summary[wk]['pl']
+                                wk_pl_trend = round((wk_pl / wk_hc) * 100, 2) if wk_hc > 0 else 0
+                                tbl += '<td style="padding:7px; border:2px solid #000; background:#f1c40f; color:#000; font-weight:700;">' + str(wk_pl_trend) + '%</td>'
+                            tbl += '</tr>'
+                            tbl += '</table>'
+                            st.markdown(tbl, unsafe_allow_html=True)
+
+                        with sum_right:
+                            if num_weeks == 1:
+                                wk = sorted_weeks[0]
+                                wk_hc = weeks_summary[wk]['hc']
+                                wk_upl_trend = round((weeks_summary[wk]['upl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
+                                wk_pl_trend = round((weeks_summary[wk]['pl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
+                                wk_label = f'Week {wk}'
+                                week_order = [' ', wk_label, '  ']
+                                chart_rows = []
+                                for lbl in week_order:
+                                    chart_rows.append({'Week': lbl, 'Metric': 'Unplanned Leave', 'Actual %': wk_upl_trend})
+                                    chart_rows.append({'Week': lbl, 'Metric': 'Planned Leave', 'Actual %': wk_pl_trend})
+                                trend_df = pd.DataFrame(chart_rows)
+                                label_df = trend_df[trend_df['Week'] == wk_label]
+                            else:
+                                week_order = [f'Week {wk}' for wk in sorted_weeks]
+                                chart_rows = []
+                                for wk in sorted_weeks:
+                                    wk_hc = weeks_summary[wk]['hc']
+                                    wk_upl_trend = round((weeks_summary[wk]['upl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
+                                    wk_pl_trend = round((weeks_summary[wk]['pl'] / wk_hc) * 100, 2) if wk_hc > 0 else 0
+                                    wk_label = f'Week {wk}'
+                                    chart_rows.append({'Week': wk_label, 'Metric': 'Unplanned Leave', 'Actual %': wk_upl_trend})
+                                    chart_rows.append({'Week': wk_label, 'Metric': 'Planned Leave', 'Actual %': wk_pl_trend})
+                                trend_df = pd.DataFrame(chart_rows)
+                                label_df = trend_df
+
+                            metric_colors = alt.Scale(domain=['Planned Leave', 'Unplanned Leave'], range=['#3b82f6', '#f97316'])
+
+                            base = alt.Chart(trend_df).encode(
+                                x=alt.X('Week:N', sort=week_order, title=None, axis=alt.Axis(domain=True, ticks=True, grid=False)),
+                            )
+
+                            trend_area = base.mark_area(line={'strokeWidth': 2.5}, opacity=0.35, interpolate='monotone').encode(
+                                y=alt.Y('Actual %:Q', title='Actual %', axis=alt.Axis(domain=True, ticks=True, grid=True)),
+                                color=alt.Color('Metric:N', scale=metric_colors, legend=alt.Legend(orient='bottom', labelFontSize=11, labelFontWeight='bold', title=None)),
+                                detail='Metric:N', tooltip=['Week', 'Metric', 'Actual %']
+                            )
+
+                            trend_points = alt.Chart(label_df).mark_point(filled=True, size=70, stroke='white', strokeWidth=1.5).encode(
+                                x=alt.X('Week:N', sort=week_order), y=alt.Y('Actual %:Q'), color=alt.Color('Metric:N', scale=metric_colors, legend=None), detail='Metric:N',
+                            )
+
+                            trend_labels = alt.Chart(label_df).mark_text(dy=-12, fontSize=10, fontWeight='bold').encode(
+                                x=alt.X('Week:N', sort=week_order), y=alt.Y('Actual %:Q'), text=alt.Text('Actual %:Q', format='.2f'), color=alt.Color('Metric:N', scale=metric_colors, legend=None), detail='Metric:N',
+                            )
+
+                            st.altair_chart((trend_area + trend_points + trend_labels).properties(height=280), use_container_width=True)
+
+                        if target_fallback_used: st.info("ℹ️ Target column not found in some DWD files — used defaults (3.50% UPL / 9.67% PL).")
+                        if upl_missing_dates: st.warning(f"⚠️ Missing DWD files for: {', '.join(upl_missing_dates)}")
+                        if upl_shift_fallback_dates: st.warning("⚠️ HC DS/NS shown from Dashboard sheet for: " + ', '.join(upl_shift_fallback_dates))
+                        if upl_error_dates: st.warning(f"⚠️ Could not read DWD file for: {', '.join(upl_error_dates)}")
+
             elif st.session_state.active_view == "Sick Leave":
                 if not sick_df.empty: st.dataframe(sick_df[['EMP Name', 'Department', 'Date', 'SL_Pattern']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=200)
                 else: st.info("No sick leave records found.")
