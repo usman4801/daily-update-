@@ -333,7 +333,7 @@ else:
         .stApp { background-color: #f3f6fb !important; background-image: none !important; }
         
         /* REDUCED SPACING & PADDING ACROSS THE BOARD */
-        .block-container { padding: 0.4rem 1rem !important; max-width: 100% !important; }
+        .block-container { padding: 0.3rem 1rem !important; max-width: 100% !important; }
         header[data-testid="stHeader"], [data-testid="stToolbar"] { display: none !important; }
         section[data-testid="stSidebar"] { background-color: #0b1220 !important; width: 250px !important; min-width: 250px !important; border-right: 1px solid rgba(255,255,255,0.06) !important; display: block !important; }
         section[data-testid="stSidebar"] .block-container { padding: 8px 14px !important; }
@@ -551,7 +551,7 @@ else:
     table_data = []
     chart_fig = go.Figure()
 
-    # --- SHIFT PERFORMANCE CALCULATION (3RD BOX LOGIC) ---
+    # --- SHIFT PERFORMANCE CALCULATIONS ---
     day_shift_hc = 0
     night_shift_hc = 0
     day_shift_present = 0
@@ -789,7 +789,7 @@ else:
                             ag_hdr_colors = ['#00695c','#00695c','#0d47a1','#e65100','#e65100','#e65100','#b71c1c','#2e7d32','#1565c0','#2e7d32']
                             ag_html += '<tr>'
                             for idx_h, col in enumerate(ag_cols):
-                                ag_html += f'<td style="padding:5px 6px; background:{ag_hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
+                                ag_html += f'<td style="padding:6px 8px; background:{ag_hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
                             ag_html += '</tr>'
                             for row_idx in range(len(agency_df_display)):
                                 is_total = agency_df_display.iloc[row_idx]['Agency'] == 'Total'
@@ -835,11 +835,10 @@ else:
                             ).properties(height=200)
                             st.altair_chart(bar_chart, use_container_width=True)
 
-                    # ===== BOX 3: INDEPENDENT MULTI-WEEK WOW SUMMARY (7:3 RATIO) =====
+                    # ===== BOX 3: INDEPENDENT 4-WEEK SUMMARY + PIE CHART =====
                     st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
                     st.markdown("**Summary:-**")
 
-                    # INDEPENDENT 4-WEEK FETCHING LOGIC FOR SUMMARY
                     all_available_files = sorted(glob.glob(f"*{selected_site}*.xlsx"))
                     summary_weeks_dict = {}
                     for f in all_available_files:
@@ -853,7 +852,7 @@ else:
                                 summary_weeks_dict[wk_num].append((f_date, f))
                             except: pass
 
-                    sorted_summary_weeks = sorted(summary_weeks_dict.keys())[-4:] # Last 4 active weeks automatically
+                    sorted_summary_weeks = sorted(summary_weeks_dict.keys())[-4:]
 
                     sum_left, sum_right = st.columns([7, 3])
 
@@ -868,7 +867,6 @@ else:
                                 tbl += f'<td style="padding:5px; background:#9b59b6; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Week {wk}</td>'
                             tbl += '</tr>'
 
-                            # Calculate aggregates per week dynamically
                             w_metrics = {}
                             for wk in sorted_summary_weeks:
                                 w_hc, w_upl, w_pl, w_upl_tsum, w_pl_tsum = 0, 0, 0, 0.0, 0.0
@@ -876,7 +874,6 @@ else:
                                     try:
                                         with pd.ExcelFile(f_path) as xl:
                                             dash = xl.parse('Dashboard', dtype=str, header=None)
-                                            rdf = xl.parse('Roster', dtype=str, header=None)
                                         tot_hc = int(dash.iloc[8, 3])
                                         upl_val = int(dash.iloc[8, 6])
                                         pl_val = int(dash.iloc[8, 4])
@@ -896,7 +893,7 @@ else:
                                     'pl_a': round((w_pl / w_hc) * 100, 2) if w_hc > 0 else 0.0,
                                 }
 
-                            # UPL Target Row
+                            # UPL Target
                             tbl += '<tr>'
                             tbl += f'<td rowspan="4" style="padding:5px; background:#c8e6c9; color:#000; font-weight:800; font-size:12px; text-align:center; border:1px solid #ddd; vertical-align:middle;">{selected_site}</td>'
                             tbl += '<td rowspan="2" style="padding:5px; background:#fde0d0; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Unplanned Leave (UPL)</td>'
@@ -905,7 +902,7 @@ else:
                                 tbl += f'<td style="padding:5px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{w_metrics[wk]["upl_t"]:.2f}%</td>'
                             tbl += '</tr>'
 
-                            # UPL Actual Row
+                            # UPL Actual
                             tbl += '<tr>'
                             tbl += '<td style="padding:5px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
                             for wk in sorted_summary_weeks:
@@ -915,7 +912,7 @@ else:
                                 tbl += f'<td style="padding:5px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{act:.2f}%</td>'
                             tbl += '</tr>'
 
-                            # PL Target Row
+                            # PL Target
                             tbl += '<tr>'
                             tbl += '<td rowspan="2" style="padding:5px; background:#e0f7fa; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Planned Leave (PL)</td>'
                             tbl += '<td style="padding:5px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
@@ -923,7 +920,7 @@ else:
                                 tbl += f'<td style="padding:5px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{w_metrics[wk]["pl_t"]:.2f}%</td>'
                             tbl += '</tr>'
 
-                            # PL Actual Row
+                            # PL Actual
                             tbl += '<tr>'
                             tbl += '<td style="padding:5px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
                             for wk in sorted_summary_weeks:
@@ -963,6 +960,32 @@ else:
                             st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
                         else:
                             st.info("No Leave Data available.")
+
+        elif st.session_state.active_view == "Shift Performance":
+            # --- DEDICATED SHIFT PERFORMANCE BREAKDOWN VIEW (3RD BOX) ---
+            st.markdown("### ⚡ Shift Performance Breakdown (Day Shift vs Night Shift)")
+            st.markdown(f"**Current Site:** {selected_site} | **Current Period Performance:** {shift_perf_display}")
+            st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+            
+            s_col1, s_col2 = st.columns(2)
+            with s_col1:
+                st.markdown(f"""
+                <div class="content-box" style="border-left: 5px solid #3b82f6;">
+                    <h4>☀️ Day Shift (DS) Analytics</h4>
+                    <p><b>Total Headcount Scheduled:</b> {day_shift_hc:,}</p>
+                    <p><b>Present Count:</b> {day_shift_present:,}</p>
+                    <p><b>Attendance Efficiency:</b> <span style="color:#2563eb; font-weight:800; font-size:18px;">{day_perf_pct}%</span></p>
+                </div>
+                """, unsafe_allow_html=True)
+            with s_col2:
+                st.markdown(f"""
+                <div class="content-box" style="border-left: 5px solid #8b5cf6;">
+                    <h4>🌙 Night Shift (NS) Analytics</h4>
+                    <p><b>Total Headcount Scheduled:</b> {night_shift_hc:,}</p>
+                    <p><b>Present Count:</b> {night_shift_present:,}</p>
+                    <p><b>Attendance Efficiency:</b> <span style="color:#8b5cf6; font-weight:800; font-size:18px;">{night_perf_pct}%</span></p>
+                </div>
+                """, unsafe_allow_html=True)
 
         elif st.session_state.active_view == "Sick Leave":
             if not sick_df.empty: st.dataframe(sick_df[['EMP Name', 'Department', 'Date', 'SL_Pattern']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=400)
@@ -1024,18 +1047,18 @@ else:
                 st.markdown("</div>", unsafe_allow_html=True)
                 
             with k3:
-                # 3RD BOX: SHIFT PERFORMANCE BREAKDOWN (WITH DEDICATED VIEW)
+                # 3RD BOX: SHIFT PERFORMANCE BREAKDOWN (LINKED TO DEDICATED SHIFT VIEW)
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
                         <span class="kpi-title">Shift Performance Breakdown</span>
                         <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
                     </div>
-                    <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("UPL Report",), use_container_width=True)
+                st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("Shift Performance",), use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
                 
             with k4:
