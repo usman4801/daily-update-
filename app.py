@@ -27,7 +27,7 @@ def toggle_view(view_name):
 
 
 # ==========================================
-#              1. LOGIN PAGE
+#              1. LOGIN PAGE (FIXED)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
@@ -37,28 +37,39 @@ if not st.session_state.logged_in:
             font-family: 'Plus Jakarta Sans', sans-serif !important;
         }
         
-        /* Dark Amazon Navy Background for Login */
+        /* Modern Premium Gradient Background */
         .stApp {
-            background: linear-gradient(135deg, #131A22 0%, #232F3E 100%) !important;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #38bdf8 100%) !important;
         }
         
+        /* Center the container */
         div[data-testid="stVerticalBlock"] {
             display: flex;
             justify-content: center;
             align-items: center;
         }
 
-        /* Style the Text Inputs */
+        /* ----------------------------------------------------
+           MAGIC FIX: MAKE THE STREAMLIT FORM A SINGLE WHITE CARD 
+           ---------------------------------------------------- */
+        [data-testid="stForm"] {
+            background-color: white !important;
+            border-radius: 20px !important;
+            padding: 35px 30px !important;
+            border: none !important;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important;
+        }
+
+        /* Style the Text Inputs Inside the Card */
         div[data-testid="stTextInput"] label {
-            color: #475569 !important;
-            font-weight: 600 !important;
+            color: #1e293b !important;
+            font-weight: 700 !important;
             font-size: 13px !important;
         }
         div[data-testid="stTextInput"] div[data-baseweb="input"] {
             border-radius: 8px !important;
             border: 1px solid #cbd5e1 !important;
             background-color: #f8fafc !important;
-            padding: 4px 8px !important;
         }
         div[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
             border-color: #f90 !important;
@@ -66,28 +77,24 @@ if not st.session_state.logged_in:
         }
 
         /* Style the Login Button */
-        div.stButton > button {
+        [data-testid="stFormSubmitButton"] > button {
             background-color: #FFD814 !important; /* Amazon Yellow */
             color: #0F1111 !important;
-            font-weight: 700 !important;
+            font-weight: 800 !important;
             font-size: 15px !important;
             border-radius: 8px !important;
             border: 1px solid #FCD200 !important;
             width: 100% !important;
-            padding: 12px !important;
-            margin-top: 15px !important;
+            padding: 8px !important;
+            margin-top: 10px !important;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
             transition: all 0.2s ease-in-out !important;
         }
-        div.stButton > button:hover {
+        [data-testid="stFormSubmitButton"] > button:hover {
             background-color: #F7CA00 !important;
             border-color: #F2C200 !important;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
         }
-        
-        .login-footer { text-align: center; margin-top: 20px; font-size: 12px; color: #64748b; }
-        .login-footer a { color: #2563eb; text-decoration: none; font-weight: 600; }
-        .login-footer a:hover { text-decoration: underline; }
         
         /* Hide sidebar completely on login page */
         [data-testid="stSidebar"] { display: none !important; }
@@ -98,40 +105,35 @@ if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 1.2, 1])
 
     with col2:
-        st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
-        with st.container():
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        
+        # Everything goes inside the Form so it shares the same white box!
+        with st.form("login_form"):
             st.markdown("""
-            <div style="background-color: white; padding: 40px; border-radius: 16px; box-shadow: 0 15px 30px rgba(0,0,0,0.3); margin-bottom: 20px;">
-                <div style="text-align: center; margin-bottom: 25px;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" width="120" style="margin-bottom: 20px;">
-                    <h2 style="color: #0f172a; font-weight: 800; font-size: 24px; margin: 0; padding-bottom: 5px;">PXT Analytics</h2>
-                    <p style="color: #64748b; font-size: 13px; margin: 0;">Internal Portal • Sign in to continue</p>
-                </div>
+            <div style="text-align: center; margin-bottom: 25px;">
+                <!-- ROBOT IS HERE! -->
+                <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" width="90" style="margin-bottom: 5px; filter: drop-shadow(0px 10px 10px rgba(0,0,0,0.1));">
+                <br>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" width="115" style="margin-bottom: 12px;">
+                <h2 style="color: #0f172a; font-weight: 800; font-size: 24px; margin: 0; padding-bottom: 2px;">PXT Analytics</h2>
+                <p style="color: #64748b; font-size: 12.5px; margin: 0;">Internal Portal • Sign in to continue</p>
             </div>
             """, unsafe_allow_html=True)
-            
-            st.markdown("<div style='background: white; padding: 0 40px 10px 40px; margin-top: -30px; border-radius: 0 0 16px 16px;'>", unsafe_allow_html=True)
             
             username = st.text_input("Amazon Login ID", placeholder="e.g. javmuhak")
             password = st.text_input("Password", type="password", placeholder="Enter your password")
             
-            if st.button("Sign In"):
+            submitted = st.form_submit_button("Sign In")
+            if submitted:
                 if username and password:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
                     st.error("Please enter both Login ID and Password.")
-                    
-            st.markdown("""
-                <div class="login-footer">
-                    Need help? <a href="#">Contact IT Support</a>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
         st.markdown("""
-            <div style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 30px;">
-                © 2026 Amazon.com, Inc. or its affiliates. Confidential and Proprietary.
+            <div style="text-align: center; color: #cbd5e1; font-size: 11.5px; margin-top: 20px;">
+                © 2026 Amazon.com, Inc. or its affiliates. Confidential.
             </div>
         """, unsafe_allow_html=True)
 
@@ -195,21 +197,17 @@ else:
         section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #1e293b !important; color: #38bdf8 !important; }
         section[data-testid="stSidebar"] div.stButton:first-of-type > button { background-color: #1e293b !important; color: #38bdf8 !important; font-weight: 600 !important; }
 
-        /* =====================================================================
-           MAGIC CSS: INVISIBLE BUTTON OVERLAYS (Fixes Alignment & Click Issues)
-           ===================================================================== */
+        /* KPI Cards */
         .kpi-card { 
             background: white; 
             border: 1px solid #e2e8f0; 
             border-radius: 12px; 
             padding: 14px 16px; 
-            height: 110px; /* Fixed height for exact match */
+            height: 110px; 
             margin-bottom: 0px; 
             transition: all 0.2s ease;
             position: relative;
         }
-        
-        /* Hover effect for the tile */
         div.element-container:has(.btn-overlay):hover .kpi-card,
         div.element-container:has(.btn-overlay) + div.element-container:hover {
             border-color: #38bdf8 !important;
@@ -217,7 +215,6 @@ else:
             transform: translateY(-2px) !important;
         }
         
-        /* Pull Streamlit button exactly over the HTML card and make it invisible */
         div.element-container:has(.btn-overlay) + div.element-container {
             margin-top: -110px !important;
             margin-bottom: 0px !important;
@@ -225,14 +222,13 @@ else:
             z-index: 10 !important;
         }
         div.element-container:has(.btn-overlay) + div.element-container div.stButton > button {
-            opacity: 0 !important; /* Button is completely invisible */
+            opacity: 0 !important; 
             height: 110px !important;
             width: 100% !important;
             cursor: pointer !important;
             padding: 0 !important;
             margin: 0 !important;
         }
-        /* ===================================================================== */
 
         .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
         .kpi-val { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
@@ -255,7 +251,6 @@ else:
         .ai-insight-btn:hover { transform: scale(1.03); }
         .action-link:hover { cursor: pointer; text-decoration: underline; }
 
-        /* Fix Datepicker layout */
         div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label { display: none !important; }
         div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"] { border-radius: 20px !important; min-height: 36px !important; height: 36px !important; border: 1px solid #e2e8f0 !important; background-color: white !important; }
     </style>
@@ -279,9 +274,8 @@ else:
             if st.button(item, key=f"nav_{item}"):
                 st.toast(f"Navigating to {item}...", icon="🚀")
         
-        # Logout button
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-        if st.button("🚪 Logout", key="logout_btn"):
+        if st.button("🚪 Logout", key="logout_btn_dash"):
             st.session_state.logged_in = False
             st.rerun()
 
@@ -452,7 +446,7 @@ else:
             st.info("Please make sure 'banner.png' is in the same folder as app.py")
         st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-        # --- KPI Row with PERFECTLY INSIDE INVISIBLE BUTTONS ---
+        # --- KPI Row ---
         k1, k2, k3, k4 = st.columns(4)
         
         with k1:
@@ -463,8 +457,7 @@ else:
                     <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">👥</span>
                 </div>
                 <div class="kpi-val">{total_emp_count:,}</div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                    <span style="font-size:10px; color:#94a3b8;">In selected period</span>
+                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
@@ -480,8 +473,7 @@ else:
                     <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
                 </div>
                 <div class="kpi-val">{total_sick:,}</div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                    <span style="font-size:10px; color:#94a3b8;">Total SL days</span>
+                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
@@ -497,8 +489,7 @@ else:
                     <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">📅</span>
                 </div>
                 <div class="kpi-val">{one_day_events:,}</div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                    <span style="font-size:10px; color:#94a3b8;">Single day leaves</span>
+                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
@@ -512,10 +503,9 @@ else:
                 <div style="display:flex; justify-content:space-between;">
                     <span class="kpi-title">2+ Days Sick Events</span>
                     <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
-            </div>
+                </div>
                 <div class="kpi-val">{two_day_events:,}</div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                    <span style="font-size:10px; color:#94a3b8;">Consecutive leaves</span>
+                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
                     <span style="font-size:10px; color:#0284c7; font-weight:700; background:#f0f9ff; border: 1px solid #bae6fd; padding:3px 8px; border-radius:12px;">👀 View</span>
                 </div>
             </div>
