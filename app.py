@@ -1036,7 +1036,7 @@ else:
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Total Sick Leave</span>
+                        <span class="kpi-title">Mispunches</span>
                         <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
                     </div>
                     <div class="kpi-val">{total_sick:,}</div>
@@ -1051,7 +1051,7 @@ else:
                 st.markdown(f"""
                 <div class="kpi-card">
                     <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Shift Performance Breakdown</span>
+                        <span class="kpi-title">Repeated Mispunches</span>
                         <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
                     </div>
                     <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
@@ -1144,9 +1144,17 @@ else:
         <a href="#" class="ai-insight-btn" onclick="alert('Generating Coaching templates...');">Start Coaching →</a>
         </div>""", unsafe_allow_html=True)
 
-            st.markdown("""<div class="content-box" style="margin-bottom: 10px; padding: 10px 14px;"><div style="font-weight: 700; font-size: 12.5px; color: #0f172a; margin-bottom: 6px;">⚡ Quick Actions</div>""", unsafe_allow_html=True)
-            if st.button("📥 Export High-Risk CSV", use_container_width=True): st.success("✅ Risk Report Exported as CSV!")
-            if st.button("📝 Generate Coaching File", use_container_width=True): st.success("✅ Coaching template created successfully!")
+            st.markdown(f"""
+                <div class="kpi-card">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span class="kpi-title">Defaulter Hours</span>
+                        <span style="background:#ede9fe; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">⏰</span>
+                    </div>
+                    <div class="kpi-val">0</div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_defaulter_hours", on_click=toggle_view, args=("Defaulter Hours",), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("""<div class="content-box" style="margin-bottom: 10px;"><div class="box-header">📊 Range SL Breakdown</div>""", unsafe_allow_html=True)
