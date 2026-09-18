@@ -209,8 +209,10 @@ def process_attendance_compliance_data(dates_tuple, warehouse, roster_map):
         d_str = d.strftime("%Y-%m-%d")
         d_str_tag = d.strftime("%d%m%Y")
         possible_paths = [
+            os.path.join(warehouse, f"{d_str}.xlsx.xlsx"),
             os.path.join(warehouse, f"{d_str}.xlsx"),
             os.path.join(warehouse, f"DWD-{warehouse}-{d_str_tag}.xlsx"),
+            f"{d_str}.xlsx.xlsx",
             f"{d_str}.xlsx",
             f"DWD-{warehouse}-{d_str_tag}.xlsx"
         ]
@@ -1114,7 +1116,7 @@ else:
 
             st.markdown("""
             <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
-                <div style="font-size:10.5px; color:#166534; font-weight:600; line-height:1.3;">
+                <div style="font-size:10.5px; color:#166534; font-weight:600; line-string; line-height:1.3;">
                     "Data is only useful if it helps us support our people."
                 </div>
                 <span style="color:#dc2626; font-size:14px; margin-left:8px;">🤍</span>
