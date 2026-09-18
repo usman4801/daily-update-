@@ -381,9 +381,9 @@ else:
         .tiny-home button:hover { background: transparent !important; transform: scale(1.1); color: #2563eb !important; }
 
         /* KPI Cards */
-        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; height: 90px; margin-bottom: 4px; position: relative; z-index: 1; }
-        .kpi-title { font-size: 11px; font-weight: 600; color: #64748b; }
-        .kpi-val { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
+        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 10px; height: 76px; margin-bottom: 3px; position: relative; z-index: 1; overflow: hidden; }
+        .kpi-title { font-size: 10px; font-weight: 600; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kpi-val { font-size: 19px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
         
         .content-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; }
         .box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #0f172a; }
@@ -1009,75 +1009,119 @@ else:
     # MAIN DASHBOARD VIEW (WHEN NO DETAIL IS SELECTED)
     # ==========================================
     else:
+        top_main, top_side = st.columns([7.4, 2.6])
+
+        with top_main:
+            try: st.image("banner.png", use_container_width=True)
+            except: pass
+
+        with top_side:
+            st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 18px; color: white; margin-bottom: 10px; position: relative; overflow: hidden;">
+        <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;"><span style="font-size:14px;">🤖</span> AI ASSISTANT</div>
+        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:12px; top:18px; width:75px; z-index: 1; opacity: 0.95;">
+        <div style="font-weight:800; font-size:17px; margin: 6px 0 12px 0; position: relative; z-index: 2;">Range Analyzed!</div>
+        <div style="font-size:12.5px; line-height:1.4; opacity:0.95; width:65%; margin-bottom:16px; position: relative; z-index: 2;">
+        Hi PXT! 👋<br>I've filtered out single absences. Focus on the table for employees needing coaching or Medical Certs.
+        </div>
+        <a href="#" class="ai-insight-btn" onclick="alert('Generating Coaching templates...');">Start Coaching →</a>
+        </div>""", unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+        # ===== FULL-WIDTH TILE ROW: 6 EQUAL-SIZE TILES, TIGHT SPACING =====
+        k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
+
+        with k1:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="kpi-title">UPL Report</span>
+                    <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">📉</span>
+                </div>
+                <div class="kpi-val">{total_upl_metric:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_upl", on_click=toggle_view, args=("UPL Report",), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with k2:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="kpi-title">Mispunches</span>
+                    <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
+                </div>
+                <div class="kpi-val">{total_sick:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_sl", on_click=toggle_view, args=("Sick Leave",), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with k3:
+            # SHIFT PERFORMANCE BREAKDOWN (LINKED TO DEDICATED SHIFT VIEW)
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="kpi-title">Repeated Mispunches</span>
+                    <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
+                </div>
+                <div style="font-size: 11.5px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("Shift Performance",), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with k4:
+            # SICK LEAVE PATTERN
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="kpi-title">Sick Leave Pattern</span>
+                    <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
+                </div>
+                <div class="kpi-val">{pattern_wo_linked + pattern_consec:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_sl_pattern", on_click=toggle_view, args=("Sick Leave Pattern",), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with k5:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="kpi-title">Defaulter Hours</span>
+                    <span style="background:#ede9fe; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">⏰</span>
+                </div>
+                <div class="kpi-val">0</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_defaulter_hours", on_click=toggle_view, args=("Defaulter Hours",), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with k6:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="kpi-title">Leave Tracker</span>
+                    <span style="background:#fff7ed; color:#ea580c; padding:4px 6px; border-radius:6px; font-size:12px;">📋</span>
+                </div>
+                <div class="kpi-val">0</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
+            st.button("👁️ View Details", key="btn_leave_tracker", on_click=toggle_view, args=("Leave Tracker",), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
         col_main, col_side = st.columns([7.4, 2.6])
 
         with col_main:
-            try: st.image("banner.png", use_container_width=True)
-            except: pass 
-            st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-
-            k1, k2, k3, k4 = st.columns(4)
-            
-            with k1:
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">UPL Report</span>
-                        <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">📉</span>
-                    </div>
-                    <div class="kpi-val">{total_upl_metric:,}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_upl", on_click=toggle_view, args=("UPL Report",), use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-            with k2:
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Mispunches</span>
-                        <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
-                    </div>
-                    <div class="kpi-val">{total_sick:,}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_sl", on_click=toggle_view, args=("Sick Leave",), use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-            with k3:
-                # 3RD BOX: SHIFT PERFORMANCE BREAKDOWN (LINKED TO DEDICATED SHIFT VIEW)
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Repeated Mispunches</span>
-                        <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
-                    </div>
-                    <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("Shift Performance",), use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-            with k4:
-                # 4TH BOX: SICK LEAVE PATTERN
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Sick Leave Pattern</span>
-                        <span style="background:#dcfce7; color:#10b981; padding:4px 6px; border-radius:6px; font-size:12px;">🗓️</span>
-                    </div>
-                    <div class="kpi-val">{pattern_wo_linked + pattern_consec:,}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-                st.button("👁️ View Details", key="btn_sl_pattern", on_click=toggle_view, args=("Sick Leave Pattern",), use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-
             c_chart, c_insight = st.columns([6, 4])
             with c_chart:
                 st.markdown(f"""
@@ -1134,29 +1178,6 @@ else:
             """, unsafe_allow_html=True)
 
         with col_side:
-            st.markdown(f"""<div style="background-color: #2563eb; border-radius: 12px; padding: 18px; color: white; margin-bottom: 10px; position: relative; overflow: hidden;">
-        <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; opacity:0.9;"><span style="font-size:14px;">🤖</span> AI ASSISTANT</div>
-        <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:12px; top:18px; width:75px; z-index: 1; opacity: 0.95;">
-        <div style="font-weight:800; font-size:17px; margin: 6px 0 12px 0; position: relative; z-index: 2;">Range Analyzed!</div>
-        <div style="font-size:12.5px; line-height:1.4; opacity:0.95; width:65%; margin-bottom:16px; position: relative; z-index: 2;">
-        Hi PXT! 👋<br>I've filtered out single absences. Focus on the table for employees needing coaching or Medical Certs.
-        </div>
-        <a href="#" class="ai-insight-btn" onclick="alert('Generating Coaching templates...');">Start Coaching →</a>
-        </div>""", unsafe_allow_html=True)
-
-            st.markdown(f"""
-                <div class="kpi-card">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="kpi-title">Defaulter Hours</span>
-                        <span style="background:#ede9fe; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">⏰</span>
-                    </div>
-                    <div class="kpi-val">0</div>
-                </div>
-                """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_defaulter_hours", on_click=toggle_view, args=("Defaulter Hours",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-
             st.markdown("""<div class="content-box" style="margin-bottom: 10px;"><div class="box-header">📊 Range SL Breakdown</div>""", unsafe_allow_html=True)
             
             if total_sick > 0:
