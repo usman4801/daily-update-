@@ -73,7 +73,7 @@ def load_real_data(site, start_d, end_d):
         return pd.concat(dfs, ignore_index=True)
     return pd.DataFrame()
 
-# --- UPL/DWD Report Helper Functions ---
+# --- UPL/DWD & Compliance Report Helper Functions ---
 WEEK_ANCHOR_DATE = datetime.date(2026, 8, 2)
 WEEK_ANCHOR_NUM = 32
 
@@ -88,6 +88,15 @@ def clean_id(val):
 
 def normalize_col(c):
     return (str(c).strip().lower().replace("_", " ").replace("-", " ").replace(".", " "))
+
+def parse_time(time_val):
+    if pd.isna(time_val): return None
+    value = str(time_val).strip()
+    if value.lower() in ["nan", "none", "", "nat"]: return None
+    for fmt in ["%H:%M:%S", "%H:%M", "%I:%M:%S %p", "%I:%M %p"]:
+        try: return datetime.datetime.strptime(value, fmt).time()
+        except Exception: pass
+    return None
 
 def safe_cell(df, row, col):
     try:
@@ -174,6 +183,102 @@ def get_roster_master(roster):
 
 roster_df = load_permanent_roster()
 roster_master = get_roster_master(roster_df)
+
+def build_roster_hours_map(roster):
+    result = {}
+    if roster.empty: return result
+    for _, row in roster.iterrows():
+        cid = clean_id(row.get("_Clean_ID", ""))
+        if not cid: continue
+        row_text = " ".join(str(v).lower() for v in row.tolist())
+        if "7 hour" in row_text or "7 hr" in row_text or "7hr" in row_text or "7.0" in row_text:
+            result[cid] = "7 Hours"
+        else:
+            result[cid] = "9 Hours"
+    return result
+
+roster_hours_map = build_roster_hours_map(roster_df)
+
+@st.cache_data(show_spinner=False)
+def process_attendance_compliance_data(dates_tuple, warehouse, roster_map):
+    start_d, end_d = dates_tuple
+    date_list = [start_d + timedelta(days=i) for i in range((end_d - start_d).days + 1)]
+    t_dfs = []
+    
+    for d in date_list:
+        d_str = d.strftime("%Y-%m-%d")
+        d_str_tag = d.strftime("%d%m%Y")
+        possible_paths = [
+            os.path.join(warehouse, f"{d_str}.xlsx"),
+            os.path.join(warehouse, f"DWD-{warehouse}-{d_str_tag}.xlsx"),
+            f"{d_str}.xlsx",
+            f"DWD-{warehouse}-{d_str_tag}.xlsx"
+        ]
+        f_path = next((p for p in possible_paths if os.path.exists(p)), None)
+        if not f_path: continue
+        try:
+            tdf = pd.read_excel(f_path, sheet_name=0, dtype=str)
+            if tdf.empty: continue
+            tdf["Date"] = d_str
+            t_dfs.append(tdf)
+        except Exception:
+            pass
+
+    if not t_dfs: return pd.DataFrame()
+    a_df = pd.concat(t_dfs, ignore_index=True)
+    a_df.columns = [str(c).strip() for c in a_df.columns]
+    
+    if len(a_df.columns) < 2: return pd.DataFrame()
+    i_col, n_col = a_df.columns[0], a_df.columns[1]
+    a_df["Clean_ID"] = a_df[i_col].apply(clean_id)
+
+    def get_hours(row):
+        cid = row["Clean_ID"]
+        if cid in roster_map: return roster_map[cid]
+        return "9 Hours"
+
+    a_df["Working Hours"] = a_df.apply(get_hours, axis=1)
+    ignore_kws = ["id", "name", "psoft", "employee", "building", "country", "working hours", "clean_id", "date"]
+    p_cols = [col for col in a_df.columns if not any(k in col.lower() for k in ignore_kws)]
+    if len(p_cols) == 0 and len(a_df.columns) > 4:
+        p_cols = [c for c in a_df.columns[4:] if c != "Date"]
+
+    def analyze(row):
+        punches = [parse_time(row.get(c)) for c in p_cols]
+        punches = [p for p in punches if p is not None]
+        total_punches = len(punches)
+        target = str(row.get("Working Hours", "9 Hours"))
+        min_mins, max_mins = (405, 435) if "7" in target else (525, 555)
+
+        if total_punches == 0: return pd.Series([0, target, "00:00", "Absent", "Clean"])
+        if total_punches == 1: return pd.Series([1, target, "N/A", "Single Scan Only", "Mispunch"])
+
+        dummy = datetime.datetime(2026, 1, 1)
+        total_secs = 0
+        for i in range(0, total_punches - (total_punches % 2), 2):
+            start = datetime.datetime.combine(dummy, punches[i])
+            end = datetime.datetime.combine(dummy, punches[i + 1])
+            if end < start: end += timedelta(days=1)
+            total_secs += (end - start).total_seconds()
+
+        eff_mins = total_secs / 60
+        hr_str = f"{int(total_secs // 3600):02d}:{int((total_secs % 3600) // 60):02d}"
+
+        if total_punches % 2 == 0:
+            if min_mins <= eff_mins <= max_mins: return pd.Series([total_punches, target, hr_str, "Complete Within Window", "Clean"])
+            elif eff_mins < min_mins: return pd.Series([total_punches, target, hr_str, "Under Time", "Defaulter Hours"])
+            else: return pd.Series([total_punches, target, hr_str, "Over Time", "Defaulter Hours"])
+        return pd.Series([total_punches, target, hr_str, "Incomplete Punches", "Mispunch"])
+
+    analyzed = a_df.apply(analyze, axis=1)
+    analyzed.columns = ["Total Punches", "Assigned Target", "Calculated Hours", "Category", "Issue Type"]
+
+    basic_info = pd.DataFrame({
+        "Date": a_df["Date"],
+        "P.Soft ID": a_df[i_col].astype(str).str.replace(r"\.0$", "", regex=True).str.strip(),
+        "Employee Name": a_df[n_col].astype(str).str.replace(r"\.0$", "", regex=True).str.strip(),
+    })
+    return pd.concat([basic_info, analyzed], axis=1)
 
 @st.cache_data(show_spinner=False)
 def process_upl_files(dates_tuple, warehouse, exclude_str, master_roster):
@@ -332,7 +437,6 @@ else:
         html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
         .stApp { background-color: #f3f6fb !important; background-image: none !important; }
         
-        /* REDUCED SPACING & PADDING ACROSS THE BOARD */
         .block-container { padding: 0.3rem 1rem !important; max-width: 100% !important; }
         header[data-testid="stHeader"], [data-testid="stToolbar"] { display: none !important; }
         section[data-testid="stSidebar"] { background-color: #0b1220 !important; width: 250px !important; min-width: 250px !important; border-right: 1px solid rgba(255,255,255,0.06) !important; display: block !important; }
@@ -345,7 +449,6 @@ else:
         section[data-testid="stSidebar"] div.stButton:first-of-type > button { color: #ffffff !important; font-weight: 700 !important; }
         section[data-testid="stSidebar"] .nav-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #4b5768; margin: 4px 0 4px 4px; text-transform: uppercase; }
         
-        /* Modern Visible Buttons */
         .btn-view-details button { 
             border: 1px solid #e2e8f0 !important; 
             background-color: white !important; 
@@ -367,7 +470,6 @@ else:
             border-color: #bfdbfe !important; 
         }
         
-        /* Perfectly Aligned Tiny Home Button Style */
         .tiny-home button {
             background: transparent !important;
             border: none !important;
@@ -380,7 +482,6 @@ else:
         }
         .tiny-home button:hover { background: transparent !important; transform: scale(1.1); color: #2563eb !important; }
 
-        /* KPI Cards */
         .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 10px; height: 76px; margin-bottom: 3px; position: relative; z-index: 1; overflow: hidden; }
         .kpi-title { font-size: 10px; font-weight: 600; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .kpi-val { font-size: 19px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
@@ -399,7 +500,6 @@ else:
         .ai-insight-btn:hover { transform: scale(1.03); }
         .action-link:hover { cursor: pointer; text-decoration: underline; }
         
-        /* Squeezed Filter UI for single line */
         div[data-testid="stDateInput"] label, div[data-testid="stSelectbox"] label, div[data-testid="stMultiSelect"] label { display: none !important; }
         div[data-testid="stDateInput"] div[data-baseweb="input"], div[data-testid="stSelectbox"] div[data-baseweb="select"], div[data-testid="stMultiSelect"] div[data-baseweb="select"] { 
             border-radius: 10px !important; 
@@ -461,7 +561,7 @@ else:
         w_end = w_start + datetime.timedelta(days=6)
         weeks_dict[f"Week {w} ({w_start.strftime('%b %d')} - {w_end.strftime('%b %d')})"] = (w_start, w_end)
 
-    # --- PERFECTLY ALIGNED SINGLE-LINE TOP BAR ---
+    # --- TOP BAR ---
     top_col1, top_col2, top_col3, top_col4 = st.columns([1, 1.2, 3.5, 3])
     
     with top_col1:
@@ -527,8 +627,8 @@ else:
     if not df.empty:
         df = df[df['Date'].isin(valid_dates_set)]
 
-    # --- PROCESS UPL/DWD DATA GLOBALLY ---
-    with st.spinner("Processing Data Metrics..."):
+    # --- PROCESS DATA METRICS & COMPLIANCE ---
+    with st.spinner("Processing Data Metrics & Compliance Rules..."):
         (
             day_wise_data,
             all_roster_scheduled,
@@ -538,6 +638,20 @@ else:
             upl_shift_fallback_dates,
             target_fallback_used
         ) = process_upl_files((start_date, end_date), selected_site, "", roster_master)
+
+        attendance_compliance_df = process_attendance_compliance_data((start_date, end_date), selected_site, roster_hours_map)
+        
+        # Extraction rules for Defaulters & Mispunches
+        defaulters_df = pd.DataFrame()
+        mispunches_df = pd.DataFrame()
+        repeated_mispunches_df = pd.DataFrame()
+
+        if not attendance_compliance_df.empty:
+            defaulters_df = attendance_compliance_df[attendance_compliance_df["Issue Type"] == "Defaulter Hours"].copy()
+            mispunches_df = attendance_compliance_df[attendance_compliance_df["Issue Type"] == "Mispunch"].copy()
+            if not mispunches_df.empty:
+                mis_counts = mispunches_df["P.Soft ID"].value_counts()
+                repeated_mispunches_df = mispunches_df[mispunches_df["P.Soft ID"].isin(mis_counts[mis_counts > 1].index)].copy()
 
     total_upl_metric = sum([r['Total UPLs'] for r in day_wise_data]) if day_wise_data else 0
     total_emp_count = 0
@@ -689,9 +803,7 @@ else:
 
                     week_no = get_week(upl_files_found[0][0])
 
-                    # ===== BOX 1: DAY WISE =====
                     st.markdown("**Day wise:-**")
-
                     display_day = day_df[['Date','HC DS','HC NS','Total HC','SL','AB','ABWI','Total UPLs','Target','Trend','Total PLs','Target ','Trend ']].copy()
                     total_row_df = pd.DataFrame([{
                         'Date': 'Total', 'HC DS': t_hc_ds, 'HC NS': t_hc_ns, 'Total HC': t_hc,
@@ -737,232 +849,40 @@ else:
                     day_html += '</table>'
                     st.markdown(day_html, unsafe_allow_html=True)
 
-                    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+        elif st.session_state.active_view == "Mispunches":
+            st.markdown("### ⚠️ Mispunch Attendance Records")
+            if not mispunches_df.empty:
+                search_q = st.text_input("🔍 Search Employee by Name or ID...", key="search_mispunches")
+                filtered_df = mispunches_df.copy()
+                if search_q:
+                    filtered_df = filtered_df[filtered_df["Employee Name"].str.contains(search_q, case=False, na=False) | filtered_df["P.Soft ID"].str.contains(search_q, case=False, na=False)]
+                st.dataframe(filtered_df.reset_index(drop=True), use_container_width=True, height=400)
+            else:
+                st.info("✅ No mispunch anomalies recorded for this period.")
 
-                    # ===== BOX 2: AGENCY WISE + BAR CHART =====
-                    if all_roster_scheduled:
-                        combined_roster = pd.concat(all_roster_scheduled, ignore_index=True)
-                        combined_roster['3P'] = combined_roster['3P'].replace('QuessCorp', 'Quesscorp')
+        elif st.session_state.active_view == "Repeated Mispunches":
+            st.markdown("### 🔄 Repeated Mispunches (Employees with >1 Mispunch)")
+            if not repeated_mispunches_df.empty:
+                search_q = st.text_input("🔍 Search Employee...", key="search_rep_mis")
+                filtered_df = repeated_mispunches_df.copy()
+                if search_q:
+                    filtered_df = filtered_df[filtered_df["Employee Name"].str.contains(search_q, case=False, na=False) | filtered_df["P.Soft ID"].str.contains(search_q, case=False, na=False)]
+                st.dataframe(filtered_df.reset_index(drop=True), use_container_width=True, height=400)
+            else:
+                st.info("✅ No repeated mispunches detected.")
 
-                        agency_data = []
-                        for agency in sorted(combined_roster['3P'].dropna().unique()):
-                            ag = combined_roster[combined_roster['3P'] == agency]
-                            ag_hc = len(ag)
-                            ag_sl = len(ag[ag['Attendance'] == 'SL'])
-                            ag_abwi = len(ag[ag['Attendance'] == 'ABWI'])
-                            ag_ab = len(ag[ag['Attendance'] == 'AB'])
-                            ag_upl = ag_sl + ag_abwi + ag_ab
-                            ag_pl = len(ag[ag['Attendance'] == 'PL'])
-                            ag_upl_trend = round((ag_upl / ag_hc) * 100, 2) if ag_hc > 0 else 0
-                            ag_pl_trend = round((ag_pl / ag_hc) * 100, 2) if ag_hc > 0 else 0
-
-                            agency_data.append({
-                                'Agency': agency, 'Week No': week_no, 'Total HC': ag_hc,
-                                'SL': ag_sl, 'ABWI': ag_abwi, 'NCNS': ag_ab, 'Total UPLs': ag_upl,
-                                'Trend': f'{ag_upl_trend:.2f}%', 'Total PLs': ag_pl, 'PL Trend': f'{ag_pl_trend:.2f}%',
-                            })
-
-                        agency_df_display = pd.DataFrame(agency_data)
-
-                        ag_t_hc = agency_df_display['Total HC'].sum()
-                        ag_t_sl = agency_df_display['SL'].sum()
-                        ag_t_abwi = agency_df_display['ABWI'].sum()
-                        ag_t_ncns = agency_df_display['NCNS'].sum()
-                        ag_t_upl = agency_df_display['Total UPLs'].sum()
-                        ag_t_pl = agency_df_display['Total PLs'].sum()
-                        ag_t_upl_trend = round((ag_t_upl / ag_t_hc) * 100, 2) if ag_t_hc > 0 else 0
-                        ag_t_pl_trend = round((ag_t_pl / ag_t_hc) * 100, 2) if ag_t_hc > 0 else 0
-
-                        ag_total_row = pd.DataFrame([{
-                            'Agency': 'Total', 'Week No': week_no, 'Total HC': ag_t_hc,
-                            'SL': ag_t_sl, 'ABWI': ag_t_abwi, 'NCNS': ag_t_ncns, 'Total UPLs': ag_t_upl,
-                            'Trend': f'{ag_t_upl_trend:.2f}%', 'Total PLs': ag_t_pl, 'PL Trend': f'{ag_t_pl_trend:.2f}%',
-                        }])
-                        agency_df_display = pd.concat([agency_df_display, ag_total_row], ignore_index=True)
-
-                        ag_left, ag_right = st.columns([6.2, 3.8])
-
-                        with ag_left:
-                            st.markdown("**Agency wise:-**")
-                            ag_html = '<table style="border-collapse:collapse; width:100%; font-size:11.5px; font-family:sans-serif;">'
-                            ag_cols = ['Agency','Week No','Total HC','SL','ABWI','NCNS','Total UPLs','Trend','Total PLs','PL Trend']
-                            ag_hdr_colors = ['#00695c','#00695c','#0d47a1','#e65100','#e65100','#e65100','#b71c1c','#2e7d32','#1565c0','#2e7d32']
-                            ag_html += '<tr>'
-                            for idx_h, col in enumerate(ag_cols):
-                                ag_html += f'<td style="padding:6px 8px; background:{ag_hdr_colors[idx_h]}; color:white; font-weight:700; text-align:center; border:1px solid #ddd; white-space:nowrap;">{col}</td>'
-                            ag_html += '</tr>'
-                            for row_idx in range(len(agency_df_display)):
-                                is_total = agency_df_display.iloc[row_idx]['Agency'] == 'Total'
-                                bg = '#fff9c4' if is_total else ('#f1f8e9' if row_idx % 2 == 0 else '#ffffff')
-                                fw = '700' if is_total else '500'
-                                ag_html += f'<tr style="background:{bg};">'
-                                for col in ag_cols:
-                                    val = agency_df_display.iloc[row_idx][col]
-                                    cell_bg = ''
-                                    if col == 'Trend' and not is_total:
-                                        try:
-                                            tv = float(str(val).replace('%',''))
-                                            cell_bg = 'background:#ffcdd2;' if tv > 3.50 else 'background:#c8e6c9;'
-                                        except: pass
-                                    if col == 'PL Trend' and not is_total:
-                                        try:
-                                            tv = float(str(val).replace('%',''))
-                                            cell_bg = 'background:#ffcdd2;' if tv > 7.16 else 'background:#c8e6c9;'
-                                        except: pass
-                                    ag_html += f'<td style="padding:4px 6px; text-align:center; border:1px solid #ddd; font-weight:{fw}; {cell_bg} white-space:nowrap;">{val}</td>'
-                                ag_html += '</tr>'
-                            ag_html += '</table>'
-                            st.markdown(ag_html, unsafe_allow_html=True)
-
-                        with ag_right:
-                            st.markdown("**📊 Agency UPL Share**")
-                            chart_data = agency_df_display[agency_df_display['Agency'] != 'Total'][['Agency', 'Total UPLs']].copy()
-                            chart_data = chart_data.sort_values('Total UPLs', ascending=False).reset_index(drop=True)
-
-                            gradient_colors = ['#b71c1c', '#e53935', '#f57c00', '#fdd835', '#81c784', '#2e7d32']
-                            num_bars = len(chart_data)
-                            bar_colors = gradient_colors[:num_bars] if num_bars <= len(gradient_colors) else gradient_colors
-                            chart_data['Color'] = bar_colors[:num_bars]
-                            agency_order = chart_data['Agency'].tolist()
-
-                            bar_chart = alt.Chart(chart_data).mark_bar(
-                                cornerRadiusTopLeft=4, cornerRadiusTopRight=4, size=24,
-                            ).encode(
-                                x=alt.X('Agency:N', sort=agency_order, axis=alt.Axis(labelAngle=-45, labelFontSize=10, title=None)),
-                                y=alt.Y('Total UPLs:Q', title='Total UPL Count', axis=alt.Axis(tickCount=5)),
-                                color=alt.Color('Agency:N', legend=None, scale=alt.Scale(domain=agency_order, range=bar_colors[:num_bars])),
-                                tooltip=['Agency', 'Total UPLs']
-                            ).properties(height=200)
-                            st.altair_chart(bar_chart, use_container_width=True)
-
-                    # ===== BOX 3: INDEPENDENT 4-WEEK SUMMARY + PIE CHART =====
-                    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
-                    st.markdown("**Summary:-**")
-
-                    all_available_files = sorted(glob.glob(f"*{selected_site}*.xlsx"))
-                    summary_weeks_dict = {}
-                    for f in all_available_files:
-                        m = re.search(r'(\d{8})', f)
-                        if m:
-                            try:
-                                f_date = datetime.datetime.strptime(m.group(1), "%d%m%Y").date()
-                                wk_num = get_week(f_date)
-                                if wk_num not in summary_weeks_dict:
-                                    summary_weeks_dict[wk_num] = []
-                                summary_weeks_dict[wk_num].append((f_date, f))
-                            except: pass
-
-                    sorted_summary_weeks = sorted(summary_weeks_dict.keys())[-4:]
-
-                    sum_left, sum_right = st.columns([7, 3])
-
-                    with sum_left:
-                        if sorted_summary_weeks:
-                            tbl = '<table style="border-collapse:collapse; width:100%; font-size:11.5px; font-family:sans-serif;">'
-                            tbl += '<tr>'
-                            tbl += '<td style="padding:5px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Site</td>'
-                            tbl += '<td style="padding:5px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Leave Type</td>'
-                            tbl += '<td style="padding:5px; background:#1a237e; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Metric</td>'
-                            for wk in sorted_summary_weeks:
-                                tbl += f'<td style="padding:5px; background:#9b59b6; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Week {wk}</td>'
-                            tbl += '</tr>'
-
-                            w_metrics = {}
-                            for wk in sorted_summary_weeks:
-                                w_hc, w_upl, w_pl, w_upl_tsum, w_pl_tsum = 0, 0, 0, 0.0, 0.0
-                                for d_dt, f_path in summary_weeks_dict[wk]:
-                                    try:
-                                        with pd.ExcelFile(f_path) as xl:
-                                            dash = xl.parse('Dashboard', dtype=str, header=None)
-                                        tot_hc = int(dash.iloc[8, 3])
-                                        upl_val = int(dash.iloc[8, 6])
-                                        pl_val = int(dash.iloc[8, 4])
-                                        ut, _ = parse_target_pct(safe_cell(dash, 2, 13), 3.50)
-                                        pt, _ = parse_target_pct(safe_cell(dash, 2, 14), 9.67)
-                                        w_hc += tot_hc
-                                        w_upl += upl_val
-                                        w_pl += pl_val
-                                        w_upl_tsum += ut * tot_hc
-                                        w_pl_tsum += pt * tot_hc
-                                    except: pass
-                                w_metrics[wk] = {
-                                    'hc': w_hc, 'upl': w_upl, 'pl': w_pl,
-                                    'upl_t': round(w_upl_tsum / w_hc, 2) if w_hc > 0 else 3.50,
-                                    'pl_t': round(w_pl_tsum / w_hc, 2) if w_hc > 0 else 9.67,
-                                    'upl_a': round((w_upl / w_hc) * 100, 2) if w_hc > 0 else 0.0,
-                                    'pl_a': round((w_pl / w_hc) * 100, 2) if w_hc > 0 else 0.0,
-                                }
-
-                            # UPL Target
-                            tbl += '<tr>'
-                            tbl += f'<td rowspan="4" style="padding:5px; background:#c8e6c9; color:#000; font-weight:800; font-size:12px; text-align:center; border:1px solid #ddd; vertical-align:middle;">{selected_site}</td>'
-                            tbl += '<td rowspan="2" style="padding:5px; background:#fde0d0; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Unplanned Leave (UPL)</td>'
-                            tbl += '<td style="padding:5px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
-                            for wk in sorted_summary_weeks:
-                                tbl += f'<td style="padding:5px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{w_metrics[wk]["upl_t"]:.2f}%</td>'
-                            tbl += '</tr>'
-
-                            # UPL Actual
-                            tbl += '<tr>'
-                            tbl += '<td style="padding:5px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
-                            for wk in sorted_summary_weeks:
-                                act = w_metrics[wk]["upl_a"]
-                                tgt = w_metrics[wk]["upl_t"]
-                                cell_bg = 'background:#ffcdd2;' if act > tgt else 'background:#c8e6c9;'
-                                tbl += f'<td style="padding:5px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{act:.2f}%</td>'
-                            tbl += '</tr>'
-
-                            # PL Target
-                            tbl += '<tr>'
-                            tbl += '<td rowspan="2" style="padding:5px; background:#e0f7fa; color:#000; font-weight:700; text-align:center; border:1px solid #ddd; vertical-align:middle;">Planned Leave (PL)</td>'
-                            tbl += '<td style="padding:5px; background:#2e7d32; color:white; font-weight:700; text-align:center; border:1px solid #ddd;">Target</td>'
-                            for wk in sorted_summary_weeks:
-                                tbl += f'<td style="padding:5px; background:#ffffff; text-align:center; border:1px solid #ddd; font-weight:700;">{w_metrics[wk]["pl_t"]:.2f}%</td>'
-                            tbl += '</tr>'
-
-                            # PL Actual
-                            tbl += '<tr>'
-                            tbl += '<td style="padding:5px; background:#f1c40f; color:#000; font-weight:700; text-align:center; border:1px solid #ddd;">Actual</td>'
-                            for wk in sorted_summary_weeks:
-                                act = w_metrics[wk]["pl_a"]
-                                tgt = w_metrics[wk]["pl_t"]
-                                cell_bg = 'background:#ffcdd2;' if act > tgt else 'background:#c8e6c9;'
-                                tbl += f'<td style="padding:5px; {cell_bg} text-align:center; border:1px solid #ddd; font-weight:700;">{act:.2f}%</td>'
-                            tbl += '</tr>'
-
-                            tbl += '</table>'
-                            st.markdown(tbl, unsafe_allow_html=True)
-                        else:
-                            st.info("No multi-week files found for summary comparison.")
-
-                    with sum_right:
-                        st.markdown("**📊 PL vs UPL Share**")
-                        t_sum_upl = sum([w_metrics[wk]['upl'] for wk in sorted_summary_weeks]) if sorted_summary_weeks else 0
-                        t_sum_pl = sum([w_metrics[wk]['pl'] for wk in sorted_summary_weeks]) if sorted_summary_weeks else 0
-                        
-                        if t_sum_upl + t_sum_pl > 0:
-                            fig_pie = go.Figure(data=[go.Pie(
-                                labels=['Unplanned (UPL)', 'Planned (PL)'],
-                                values=[t_sum_upl, t_sum_pl],
-                                hole=0.6,
-                                marker=dict(colors=['#f97316', '#3b82f6']),
-                                textinfo='percent',
-                                hoverinfo='label+value'
-                            )])
-                            fig_pie.update_layout(
-                                height=180, 
-                                margin=dict(l=10, r=10, t=10, b=10),
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                plot_bgcolor='rgba(0,0,0,0)',
-                                showlegend=True,
-                                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5)
-                            )
-                            st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
-                        else:
-                            st.info("No Leave Data available.")
+        elif st.session_state.active_view == "Defaulter Hours":
+            st.markdown("### ⏰ Defaulter Hours Records (Under-time / Over-time)")
+            if not defaulters_df.empty:
+                search_q = st.text_input("🔍 Search Employee...", key="search_defaulters")
+                filtered_df = defaulters_df.copy()
+                if search_q:
+                    filtered_df = filtered_df[filtered_df["Employee Name"].str.contains(search_q, case=False, na=False) | filtered_df["P.Soft ID"].str.contains(search_q, case=False, na=False)]
+                st.dataframe(filtered_df.reset_index(drop=True), use_container_width=True, height=400)
+            else:
+                st.info("✅ No defaulter hours logged for this period.")
 
         elif st.session_state.active_view == "Shift Performance":
-            # --- DEDICATED SHIFT PERFORMANCE BREAKDOWN VIEW (3RD BOX) ---
             st.markdown("### ⚡ Shift Performance Breakdown (Day Shift vs Night Shift)")
             st.markdown(f"**Current Site:** {selected_site} | **Current Period Performance:** {shift_perf_display}")
             st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
@@ -993,17 +913,12 @@ else:
         elif st.session_state.active_view == "Sick Leave Pattern":
             st.markdown("### 🔍 Sick Leave Pattern Analysis (Near Week-Off & Consecutive)")
             tab1, tab2 = st.tabs(["🏖️ SL Near Week-Off", "🗓️ Consecutive SL Events"])
-            
             with tab1:
-                if not df_wo_linked.empty:
-                    st.dataframe(df_wo_linked.reset_index(drop=True), use_container_width=True, height=400)
-                else:
-                    st.info("No Week-Off linked SL found for selected range.")
+                if not df_wo_linked.empty: st.dataframe(df_wo_linked.reset_index(drop=True), use_container_width=True, height=400)
+                else: st.info("No Week-Off linked SL found for selected range.")
             with tab2:
-                if not df_consecutive.empty:
-                    st.dataframe(df_consecutive.reset_index(drop=True), use_container_width=True, height=400)
-                else:
-                    st.info("No consecutive sick leave events found for selected range.")
+                if not df_consecutive.empty: st.dataframe(df_consecutive.reset_index(drop=True), use_container_width=True, height=400)
+                else: st.info("No consecutive sick leave events found for selected range.")
 
     # ==========================================
     # MAIN DASHBOARD VIEW (WHEN NO DETAIL IS SELECTED)
@@ -1021,14 +936,14 @@ else:
         <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" style="position:absolute; right:12px; top:18px; width:75px; z-index: 1; opacity: 0.95;">
         <div style="font-weight:800; font-size:17px; margin: 6px 0 12px 0; position: relative; z-index: 2;">Range Analyzed!</div>
         <div style="font-size:12.5px; line-height:1.4; opacity:0.95; width:65%; margin-bottom:16px; position: relative; z-index: 2;">
-        Hi PXT! 👋<br>I've filtered out single absences. Focus on the table for employees needing coaching or Medical Certs.
+        Hi PXT! 👋<br>Compliance monitoring is active. Check the tiles below for Mispunches, Defaulter Hours, and UPL metrics.
         </div>
         <a href="#" class="ai-insight-btn" onclick="alert('Generating Coaching templates...');">Start Coaching →</a>
         </div>""", unsafe_allow_html=True)
 
         st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
-        # ===== FULL-WIDTH TILE ROW: 6 EQUAL-SIZE TILES, TIGHT SPACING =====
+        # ===== FULL-WIDTH TILE ROW: 6 EQUAL-SIZE TILES =====
         k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
 
         with k1:
@@ -1050,32 +965,30 @@ else:
             <div class="kpi-card">
                 <div style="display:flex; justify-content:space-between;">
                     <span class="kpi-title">Mispunches</span>
-                    <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">🤒</span>
+                    <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">⚠️</span>
                 </div>
-                <div class="kpi-val">{total_sick:,}</div>
+                <div class="kpi-val">{len(mispunches_df):,}</div>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_sl", on_click=toggle_view, args=("Sick Leave",), use_container_width=True)
+            st.button("👁️ View Details", key="btn_mispunches", on_click=toggle_view, args=("Mispunches",), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with k3:
-            # SHIFT PERFORMANCE BREAKDOWN (LINKED TO DEDICATED SHIFT VIEW)
             st.markdown(f"""
             <div class="kpi-card">
                 <div style="display:flex; justify-content:space-between;">
                     <span class="kpi-title">Repeated Mispunches</span>
-                    <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
+                    <span style="background:#fee2e2; color:#b91c1c; padding:4px 6px; border-radius:6px; font-size:12px;">🔄</span>
                 </div>
-                <div style="font-size: 11.5px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
+                <div class="kpi-val">{len(repeated_mispunches_df):,}</div>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("Shift Performance",), use_container_width=True)
+            st.button("👁️ View Details", key="btn_rep_mispunches", on_click=toggle_view, args=("Repeated Mispunches",), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with k4:
-            # SICK LEAVE PATTERN
             st.markdown(f"""
             <div class="kpi-card">
                 <div style="display:flex; justify-content:space-between;">
@@ -1096,7 +1009,7 @@ else:
                     <span class="kpi-title">Defaulter Hours</span>
                     <span style="background:#ede9fe; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">⏰</span>
                 </div>
-                <div class="kpi-val">0</div>
+                <div class="kpi-val">{len(defaulters_df):,}</div>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
@@ -1107,14 +1020,14 @@ else:
             st.markdown(f"""
             <div class="kpi-card">
                 <div style="display:flex; justify-content:space-between;">
-                    <span class="kpi-title">Leave Tracker</span>
-                    <span style="background:#fff7ed; color:#ea580c; padding:4px 6px; border-radius:6px; font-size:12px;">📋</span>
+                    <span class="kpi-title">Shift Performance</span>
+                    <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
                 </div>
-                <div class="kpi-val">0</div>
+                <div style="font-size: 11px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_leave_tracker", on_click=toggle_view, args=("Leave Tracker",), use_container_width=True)
+            st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("Shift Performance",), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -1151,7 +1064,7 @@ else:
                     </div>
                     <div style="display:flex; gap:10px;">
                         <div style="width:28px; height:28px; border-radius:50%; background:#dcfce7; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">🛡️</div>
-                        <div><div style="color:#10b981; font-weight:800; font-size:13px;">Safe Zone Active</div><div style="color:#64748b; font-size:10.5px;">Employees with only 1 SL ignored</div></div>
+                        <div><div style="color:#10b981; font-weight:800; font-size:13px;">Compliance Active</div><div style="color:#64748b; font-size:10.5px;">Active Mispunch & Defaulter check</div></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
