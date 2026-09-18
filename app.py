@@ -293,10 +293,15 @@ def process_upl_files(dates_tuple, warehouse, exclude_str, master_roster):
     target_fallback_used = False
 
     for d in date_list:
+        d_str = d.strftime('%Y-%m-%d')
         d_str_tag = d.strftime('%d%m%Y')
         possible_upl_names = [
             os.path.join(warehouse, f"DWD-{warehouse}-{d_str_tag}.xlsx"),
             f"DWD-{warehouse}-{d_str_tag}.xlsx",
+            os.path.join(warehouse, f"{d_str}.xlsx.xlsx"),
+            os.path.join(warehouse, f"{d_str}.xlsx"),
+            f"{d_str}.xlsx.xlsx",
+            f"{d_str}.xlsx",
             os.path.join(warehouse, f"DWD-{warehouse}-{d.strftime('%Y-%m-%d')}.xlsx"),
             f"DWD-{warehouse}-{d.strftime('%Y-%m-%d')}.xlsx"
         ]
@@ -306,8 +311,12 @@ def process_upl_files(dates_tuple, warehouse, exclude_str, master_roster):
             continue
         try:
             with pd.ExcelFile(file_path) as xl:
-                dash = xl.parse('Dashboard', dtype=str, header=None)
-                rdf = xl.parse('Roster', dtype=str, header=None)
+                sheet_names = xl.sheet_names
+                if 'Dashboard' in sheet_names and 'Roster' in sheet_names:
+                    dash = xl.parse('Dashboard', dtype=str, header=None)
+                    rdf = xl.parse('Roster', dtype=str, header=None)
+                else:
+                    continue
 
             hc_ds, hc_ns, total_hc = int(dash.iloc[5, 3]), int(dash.iloc[7, 3]), int(dash.iloc[8, 3])
             sl, ab_abwi = int(dash.iloc[27, 7]), int(dash.iloc[27, 8])
@@ -326,19 +335,25 @@ def process_upl_files(dates_tuple, warehouse, exclude_str, master_roster):
 
             roster = rdf.iloc[6:].copy()
             roster.columns = [str(c).strip() for c in rdf.iloc[5].tolist()]
-            roster['_Clean_ID'] = roster['Psoft No'].apply(clean_id)
+            
+            psoft_col = find_column(roster, ['psoft', 'employee id', 'emp id'])
+            if not psoft_col: continue
+            roster['_Clean_ID'] = roster[psoft_col].apply(clean_id)
 
             if 'Building' in roster.columns: roster = roster[roster['Building'] == warehouse]
             if exclude_list: roster = roster[~roster['_Clean_ID'].isin(exclude_list)]
             if 'Type' in roster.columns: roster = roster[roster['Type'] == 'Direct']
             if '3P' in roster.columns: roster['3P'] = roster['3P'].replace('QuessCorp', 'Quesscorp')
 
-            scheduled = roster[(roster['Attendance'] != 'OFF') & (roster['Attendance'].notna()) & (roster['Attendance'].astype(str).str.strip() != '')].copy()
+            att_col = find_column(roster, ['attendance'])
+            if not att_col: continue
 
-            abwi_count = len(scheduled[scheduled['Attendance'] == 'ABWI'])
-            ab_count = len(scheduled[scheduled['Attendance'] == 'AB'])
-            sl_from_roster = len(scheduled[scheduled['Attendance'] == 'SL'])
-            pl_from_roster = len(scheduled[scheduled['Attendance'] == 'PL'])
+            scheduled = roster[(roster[att_col] != 'OFF') & (roster[att_col].notna()) & (roster[att_col].astype(str).str.strip() != '')].copy()
+
+            abwi_count = len(scheduled[scheduled[att_col] == 'ABWI'])
+            ab_count = len(scheduled[scheduled[att_col] == 'AB'])
+            sl_from_roster = len(scheduled[scheduled[att_col] == 'SL'])
+            pl_from_roster = len(scheduled[scheduled[att_col] == 'PL'])
             upl_from_roster = sl_from_roster + ab_count + abwi_count
             hc_from_roster = len(scheduled)
 
@@ -1112,11 +1127,11 @@ else:
                     </div></div>
                 """, unsafe_allow_html=True)
             else:
-                 st.markdown("<div style='text-align:center; padding: 15px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
+                 st.markdown("<div style='text-align:center; padding: 15px 0; color:#64748b; font-size:11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
 
             st.markdown("""
             <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
-                <div style="font-size:10.5px; color:#166534; font-weight:600; line-string; line-height:1.3;">
+                <div style="font-size:10.5px; color:#166534; font-weight:600; line-height:1.3;">
                     "Data is only useful if it helps us support our people."
                 </div>
                 <span style="color:#dc2626; font-size:14px; margin-left:8px;">🤍</span>
