@@ -20,7 +20,6 @@ WEEK_ANCHOR_DATE = _dt.date(2026, 8, 2)
 WEEK_ANCHOR_NUM = 32
 
 def get_week(d):
-    """Return custom week number based on Sunday-to-Sunday calendar."""
     if hasattr(d, 'date'):
         d = d.date()
     delta = (d - WEEK_ANCHOR_DATE).days
@@ -33,7 +32,7 @@ st.set_page_config(
 )
 
 # ==========================================================
-# GLOBAL CSS (Fixed Calendar Month Header & Metric Cards)
+# GLOBAL CSS
 # ==========================================================
 st.markdown(
     """
@@ -41,29 +40,9 @@ st.markdown(
     #MainMenu {visibility:hidden;}
     header {visibility:hidden;}
     footer {visibility:hidden;}
-
     [data-testid="stToolbar"] {display:none !important;}
-    [data-testid="stStatusWidget"] {display:none !important;}
-    [data-testid="stDecoration"] {display:none !important;}
-    [data-testid="stcollapsedControl"] {display:none !important;}
-    .viewerBadge_container {display:none !important;}
-    .viewerBadge_link {display:none !important;}
-    #st-toolbar {display:none !important;}
-    .stActionButton {display:none !important;}
-
-    #manage-app-button {display:none !important;}
-    div[data-testid="manage-app-button"] {display:none !important;}
-    [data-testid="stConnectionStatus"] {display:none !important;}
-
-    div[data-testid="stDownloadButton"] button {
-        display:inline-flex !important;
-        visibility:visible !important;
-    }
-
-    .stApp {
-        background-color:#f8fafc;
-    }
-
+    
+    .stApp { background-color:#f8fafc; }
     .block-container {
         background:#ffffff !important;
         padding:1rem 1.5rem !important;
@@ -73,7 +52,6 @@ st.markdown(
         border:1px solid #e2e8f0 !important;
         max-width:100% !important;
     }
-
     .direct-header-img {
         width:100%;
         border-radius:14px;
@@ -82,114 +60,8 @@ st.markdown(
         border:1px solid rgba(216,180,254,0.6);
         display:block;
     }
+    .branch-logo { max-height:40px; margin-top:6px; border-radius:6px; object-fit:contain; }
 
-    div[data-testid="stSelectbox"] {
-        border:none !important;
-        padding:0 !important;
-        background:transparent !important;
-    }
-
-    div[data-testid="stSelectbox"] label p {
-        font-weight:800 !important;
-        color:#000000 !important;
-        font-size:13px !important;
-    }
-
-    div[data-testid="stDateInput"] {
-        border:2px dashed #ffb74d !important;
-        padding:4px 10px !important;
-        border-radius:10px !important;
-        background:#fffdf5 !important;
-    }
-
-    div[data-testid="stDateInput"] label p {
-        font-weight:800 !important;
-        color:#000000 !important;
-        font-size:13px !important;
-    }
-
-    /* Force Calendar Popup Month/Year Header Visibility */
-    div[data-baseweb="popover"], div[data-baseweb="calendar"] {
-        color: #0f172a !important;
-        background-color: #ffffff !important;
-    }
-    div[data-baseweb="calendar"] div, 
-    div[data-baseweb="calendar"] span, 
-    div[data-baseweb="calendar"] button {
-        color: #0f172a !important;
-    }
-    div[data-baseweb="calendar"] header {
-        background-color: #f8fafc !important;
-        border-bottom: 1px solid #e2e8f0 !important;
-        display: flex !important;
-        visibility: visible !important;
-    }
-    div[data-baseweb="calendar"] header button {
-        background-color: transparent !important;
-        color: #0f172a !important;
-        visibility: visible !important;
-        display: inline-flex !important;
-        font-size: 18px !important;
-    }
-    div[data-baseweb="calendar"] header div {
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        color: #0f172a !important;
-        visibility: visible !important;
-        display: block !important;
-    }
-    div[data-baseweb="calendar"] [aria-label="Previous month"],
-    div[data-baseweb="calendar"] [aria-label="Next month"] {
-        visibility: visible !important;
-        display: inline-flex !important;
-        font-size: 20px !important;
-        color: #0f172a !important;
-        cursor: pointer !important;
-    }
-    div[data-baseweb="popover"] {
-        z-index: 99999 !important;
-    }
-
-    .branch-logo {
-        max-height:40px;
-        margin-top:6px;
-        border-radius:6px;
-        object-fit:contain;
-    }
-
-    .feature-card {
-        padding:16px;
-        border-radius:14px;
-        height:115px;
-        display:flex;
-        flex-direction:column;
-        justify-content:center;
-        align-items:center;
-        text-align:center;
-        box-shadow:0 4px 12px rgba(0,0,0,0.04);
-        border:1.5px solid;
-    }
-
-    .fc-blue { background:#f0f6ff; border-color:#d2e3fc; }
-    .fc-orange { background:#fefce8; border-color:#fef08a; }
-    .fc-green { background:#f0fdf4; border-color:#bbf7d0; }
-    .fc-purple { background:#faf5ff; border-color:#f3e8ff; }
-
-    .fc-title {
-        font-size:13.5px;
-        font-weight:800;
-        color:#1e1b4b;
-        margin-top:6px;
-        margin-bottom:3px;
-    }
-    .fc-text {
-        font-size:11px;
-        color:#475569;
-        line-height:1.2;
-        font-weight:500;
-    }
-
-    /* Enforced Larger Top Metric Cards Size */
     div.metric-card {
         padding:26px 20px !important;
         border-radius:12px !important;
@@ -202,18 +74,15 @@ st.markdown(
         flex-direction: column !important;
         justify-content: center !important;
     }
-
     div.metric-card:hover {
         transform:translateY(-3px);
         box-shadow:0 10px 20px rgba(0,0,0,0.18);
     }
-
     .card-blue { background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%); }
     .card-red { background:linear-gradient(135deg,#ef4444 0%,#b91c1c 100%); }
     .card-orange { background:linear-gradient(135deg,#f59e0b 0%,#b45309 100%); }
     .card-purple { background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 100%); }
-    .card-green { background:linear-gradient(135deg,#10b981 0%,#047857 100%); }
-
+    
     div.card-title {
         font-size:15px !important;
         font-weight:700 !important;
@@ -222,34 +91,14 @@ st.markdown(
         text-transform:uppercase !important;
         letter-spacing:0.6px !important;
     }
-
-    div.card-value {
-        font-size:40px !important;
-        font-weight:900 !important;
-        line-height:1.1 !important;
-    }
-
-    .upl-section {
-        background:#f8fafc;
-        border:1px solid #e2e8f0;
-        border-radius:14px;
-        padding:15px;
-        margin-top:20px;
-    }
-
-    .upl-heading {
-        font-size:20px;
-        font-weight:800;
-        color:#111827;
-        margin-bottom:12px;
-    }
+    div.card-value { font-size:40px !important; font-weight:900 !important; line-height:1.1 !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # ==========================================================
-# HELPERS (CACHED)
+# HELPERS
 # ==========================================================
 @st.cache_data(show_spinner=False)
 def get_base64_of_bin_file(bin_file):
@@ -283,47 +132,8 @@ def parse_time(time_val):
             pass
     return None
 
-def percentage(numerator, denominator):
-    if denominator in [0, None] or pd.isna(denominator):
-        return 0.0
-    return round((numerator / denominator) * 100, 2)
-
-def safe_cell(df, row, col):
-    try:
-        val = df.iloc[row, col]
-        if pd.isna(val):
-            return None
-        return val
-    except Exception:
-        return None
-
-def parse_target_pct(val, default):
-    if val is None:
-        return default, False
-    try:
-        s = str(val).strip().replace('%', '')
-        if s == '' or s.lower() in ['nan', 'none']:
-            return default, False
-        return round(float(s), 2), True
-    except Exception:
-        return default, False
-
-def parse_roster_target_pct(val, default):
-    if val is None:
-        return default, False
-    try:
-        s = str(val).strip().replace('%', '')
-        if s == '' or s.lower() in ['nan', 'none']:
-            return default, False
-        f = float(s)
-        if abs(f) < 1:
-            f *= 100
-        return round(f, 2), True
-    except Exception:
-        return default, False
-
 # ==========================================================
-# HEADER
+# HEADER & FILTERS
 # ==========================================================
 header_paths = ["header_banner.png", os.path.join("AUH1", "header_banner.png")]
 header_img_str = ""
@@ -334,66 +144,29 @@ for hp in header_paths:
 
 if header_img_str:
     st.markdown(f'<img src="data:image/png;base64,{header_img_str}" class="direct-header-img">', unsafe_allow_html=True)
-else:
-    st.warning("⚠️ Please upload 'header_banner.png' to the app folder.")
 
-st.markdown('<p style="text-align:right; color:#94a3b8; font-size:11px; margin:-8px 0 4px 0;">Having trouble? Contact <b>javmuhak</b></p>', unsafe_allow_html=True)
-
-# ==========================================================
-# FILTERS
-# ==========================================================
 f_col1, f_col2 = st.columns([4, 8])
 
 with f_col1:
     selected_warehouse = st.selectbox("📍 Site", options=["AUH1", "DXB5", "DXB3"])
 
-    possible_logos = [
-        os.path.join(selected_warehouse, f"{selected_warehouse}_logo.png"),
-        os.path.join(selected_warehouse, f"{selected_warehouse}_logo.jpeg"),
-        os.path.join(selected_warehouse, f"{selected_warehouse}_logo.jpg"),
-        f"{selected_warehouse}_logo.png",
-        f"{selected_warehouse}_logo.jpeg",
-        f"{selected_warehouse}_logo.jpg",
-    ]
-
-    logo_path = next((p for p in possible_logos if file_exists(p)), None)
-
-    if logo_path:
-        logo_base64 = get_base64_of_bin_file(logo_path)
-        mime_type = "image/jpeg" if logo_path.endswith((".jpeg", ".jpg")) else "image/png"
-        st.markdown(f'<img src="data:{mime_type};base64,{logo_base64}" class="branch-logo">', unsafe_allow_html=True)
-
 with f_col2:
-    selected_dates_range = st.date_input("Select Date Range • Instant Auto-Fetch", value=[])
+    # Default date range set to current week so data loads automatically
+    default_start = datetime.today().date() - timedelta(days=6)
+    default_end = datetime.today().date()
+    selected_dates_range = st.date_input("Select Date Range • Instant Auto-Fetch", value=(default_start, default_end))
 
-# ==========================================================
-# 7-HOUR / EXCLUDE CONFIGURATION
-# ==========================================================
-st.sidebar.header("⚙️ 7-Hours Configuration")
+# Sidebar Config
+seven_hours_default = "205854274, 206247771, 206930332"
+manual_7_ids = st.sidebar.text_area("Paste 7-Hour Employee IDs", value=seven_hours_default)
+exclude_ids_input = st.sidebar.text_area("Paste IDs to Ignore", value="203160008, 106495539")
 
-seven_hours_default = (
-    "205854274, 206247771, 206930332, 206915012, 206065208, 206136723,"
-    " 206200811, 205853892, 206192237, 206361774, 206348020, 206348027,"
-    " 206348019, 206368537, 206348026, 206348045, 206348030, 206348048,"
-    " 206348049, 206348041, 206368538, 206348029, 206348042, 205845552,"
-    " 206348052, 206348054, 203875181, 203875184, 203875092, 203875089,"
-    " 203875090, 203875180, 203875183, 112463068, 203875088, 203875091,"
-    " 203875185, 203875186, 206868000, 206897671, 206897640, 206136735,"
-    " 205231290, 205252357, 206192232, 206491343, 206128578, 206136722,"
-    " 205252356, 205252538, 205199356, 206230579, 206491328, 206240253,"
-    " 206930331, 206868288, 206897649, 206868005, 206239524, 206136718"
-)
-
-manual_7_ids = st.sidebar.text_area("Paste 7-Hour Employee IDs (Comma separated)", value=seven_hours_default)
-exclude_ids_input = st.sidebar.text_area("Paste IDs to Ignore", value="203160008, 106495539, 203118578")
-
-st.sidebar.markdown("---")
 if st.sidebar.button("🔄 Refresh Data Now", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
 # ==========================================================
-# LOAD HC MASTER & ATTENDANCE PROCESSOR
+# DATA LOADING & PROCESSORS
 # ==========================================================
 @st.cache_data(show_spinner=False, ttl=300)
 def load_permanent_roster():
@@ -408,8 +181,7 @@ def load_permanent_roster():
     if roster.empty:
         return roster
     roster.columns = [str(c).strip() for c in roster.columns]
-    id_col = roster.columns[0]
-    roster["_Clean_ID"] = roster[id_col].apply(clean_id)
+    roster["_Clean_ID"] = roster[roster.columns[0]].apply(clean_id)
     return roster
 
 roster_df = load_permanent_roster()
@@ -423,7 +195,7 @@ def build_roster_hours_map(roster):
         if not cid:
             continue
         row_text = " ".join(str(v).lower() for v in row.tolist())
-        if "7 hour" in row_text or "7 hr" in row_text or "7.0" in row_text:
+        if "7 hour" in row_text or "7 hr" in row_text:
             result[cid] = "7 Hours"
         else:
             result[cid] = "9 Hours"
@@ -548,58 +320,25 @@ if isinstance(selected_dates_range, tuple) and len(selected_dates_range) == 2:
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        st.markdown(
-            f"""
-            <div class="metric-card card-purple" id="card_def">
-                <div class="card-title">⏰ Defaulter Hours</div>
-                <div class="card-value">{len(defaulters)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="metric-card card-purple" id="card_def"><div class="card-title">⏰ Defaulter Hours</div><div class="card-value">{len(defaulters)}</div></div>', unsafe_allow_html=True)
         if st.button("⏰ View Defaulters ➔", key="btn_def", use_container_width=True):
             st.session_state.selected_view = "defaulters"
 
     with c2:
-        st.markdown(
-            f"""
-            <div class="metric-card card-orange" id="card_mis">
-                <div class="card-title">⚠️ Mispunches</div>
-                <div class="card-value">{len(mispunches)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="metric-card card-orange" id="card_mis"><div class="card-title">⚠️ Mispunches</div><div class="card-value">{len(mispunches)}</div></div>', unsafe_allow_html=True)
         if st.button("⚠️ View Mispunches ➔", key="btn_mis", use_container_width=True):
             st.session_state.selected_view = "mispunches"
 
     with c3:
-        st.markdown(
-            f"""
-            <div class="metric-card card-red" id="card_rep_mis">
-                <div class="card-title">🔄 Repeated Mispunches</div>
-                <div class="card-value">{len(repeated_mispunches)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="metric-card card-red" id="card_rep_mis"><div class="card-title">🔄 Repeated Mispunches</div><div class="card-value">{len(repeated_mispunches)}</div></div>', unsafe_allow_html=True)
         if st.button("🔄 View Rep. Mispunches ➔", key="btn_rep_mis", use_container_width=True):
             st.session_state.selected_view = "rep_mispunches"
 
     with c4:
-        st.markdown(
-            f"""
-            <div class="metric-card card-blue" id="card_upl">
-                <div class="card-title">📋 UPL Report</div>
-                <div class="card-value">0</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="metric-card card-blue" id="card_upl"><div class="card-title">📋 UPL Report</div><div class="card-value">0</div></div>', unsafe_allow_html=True)
         if st.button("📋 View UPL Summary ➔", key="btn_upl", use_container_width=True):
             st.session_state.selected_view = "upl"
 
-    # JAVASCRIPT BINDING FOR CARD CLICK
     components.html(
         """
         <script>
@@ -626,7 +365,6 @@ if isinstance(selected_dates_range, tuple) and len(selected_dates_range) == 2:
         width=0,
     )
 
-    # DISPLAY VIEW DATA
     if not final_df.empty:
         display_df = final_df.copy()
         if st.session_state.selected_view == "rep_mispunches":
@@ -640,8 +378,6 @@ if isinstance(selected_dates_range, tuple) and len(selected_dates_range) == 2:
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     else:
         st.info("📂 No data found for selected warehouse and date range.")
-else:
-    st.info("👆 Please select a date range to view compliance metrics.")
 
 # FOOTER
 st.markdown("<hr style='border:none; border-top:1px solid #e2e8f0; margin:10px 0 6px 0;'>", unsafe_allow_html=True)
