@@ -682,32 +682,6 @@ else:
     table_data = []
     chart_fig = go.Figure()
 
-    # --- SHIFT PERFORMANCE CALCULATIONS ---
-    day_shift_hc = 0
-    night_shift_hc = 0
-    day_shift_present = 0
-    night_shift_present = 0
-
-    if day_wise_data:
-        for r in day_wise_data:
-            day_shift_hc += r.get('HC DS', 0)
-            night_shift_hc += r.get('HC NS', 0)
-            
-    if all_roster_scheduled:
-        combined_sched = pd.concat(all_roster_scheduled, ignore_index=True)
-        shift_col_found = find_column(combined_sched, ['shift', 'schedule', 'work shift'])
-        if shift_col_found:
-            combined_sched['Shift_Class'] = classify_shift_series(combined_sched[shift_col_found])
-            ds_df = combined_sched[combined_sched['Shift_Class'] == 'DS']
-            ns_df = combined_sched[combined_sched['Shift_Class'] == 'NS']
-            
-            day_shift_present = len(ds_df[ds_df['Attendance'] == 'P'])
-            night_shift_present = len(ns_df[ns_df['Attendance'] == 'P'])
-
-    day_perf_pct = round((day_shift_present / day_shift_hc) * 100, 1) if day_shift_hc > 0 else 0.0
-    night_perf_pct = round((night_shift_present / night_shift_hc) * 100, 1) if night_shift_hc > 0 else 0.0
-    shift_perf_display = f"DS: {day_perf_pct}% | NS: {night_perf_pct}%"
-
     if not df.empty:
         total_emp_count = df['EMP Name'].nunique()
         df['Att_Clean'] = df['Attendance'].astype(str).str.strip().str.upper()
@@ -899,30 +873,9 @@ else:
             else:
                 st.info("✅ No defaulter hours logged for this period.")
 
-        elif st.session_state.active_view == "Shift Performance":
-            st.markdown("### ⚡ Shift Performance Breakdown (Day Shift vs Night Shift)")
-            st.markdown(f"**Current Site:** {selected_site} | **Current Period Performance:** {shift_perf_display}")
-            st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
-            
-            s_col1, s_col2 = st.columns(2)
-            with s_col1:
-                st.markdown(f"""
-                <div class="content-box" style="border-left: 5px solid #3b82f6;">
-                    <h4>☀️ Day Shift (DS) Analytics</h4>
-                    <p><b>Total Headcount Scheduled:</b> {day_shift_hc:,}</p>
-                    <p><b>Present Count:</b> {day_shift_present:,}</p>
-                    <p><b>Attendance Efficiency:</b> <span style="color:#2563eb; font-weight:800; font-size:18px;">{day_perf_pct}%</span></p>
-                </div>
-                """, unsafe_allow_html=True)
-            with s_col2:
-                st.markdown(f"""
-                <div class="content-box" style="border-left: 5px solid #8b5cf6;">
-                    <h4>🌙 Night Shift (NS) Analytics</h4>
-                    <p><b>Total Headcount Scheduled:</b> {night_shift_hc:,}</p>
-                    <p><b>Present Count:</b> {night_shift_present:,}</p>
-                    <p><b>Attendance Efficiency:</b> <span style="color:#8b5cf6; font-weight:800; font-size:18px;">{night_perf_pct}%</span></p>
-                </div>
-                """, unsafe_allow_html=True)
+        elif st.session_state.active_view == "Leave Tracker":
+            st.markdown("### 📋 Leave Tracker")
+            st.info("Leave Tracker scenario is coming soon.")
 
         elif st.session_state.active_view == "Sick Leave":
             if not sick_df.empty: st.dataframe(sick_df[['EMP Name', 'Department', 'Date', 'SL_Pattern']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=400)
@@ -1037,14 +990,14 @@ else:
             st.markdown(f"""
             <div class="kpi-card">
                 <div style="display:flex; justify-content:space-between;">
-                    <span class="kpi-title">Shift Performance</span>
-                    <span style="background:#e0f2fe; color:#0284c7; padding:4px 6px; border-radius:6px; font-size:12px;">⚡</span>
+                    <span class="kpi-title">Leave Tracker</span>
+                    <span style="background:#fff7ed; color:#ea580c; padding:4px 6px; border-radius:6px; font-size:12px;">📋</span>
                 </div>
-                <div style="font-size: 11px; font-weight: 800; color: #0f172a; margin-top: 6px; line-height: 1.2;">{shift_perf_display}</div>
+                <div class="kpi-val">0</div>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_shift_perf", on_click=toggle_view, args=("Shift Performance",), use_container_width=True)
+            st.button("👁️ View Details", key="btn_leave_tracker", on_click=toggle_view, args=("Leave Tracker",), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -1127,7 +1080,7 @@ else:
                     </div></div>
                 """, unsafe_allow_html=True)
             else:
-                 st.markdown("<div style='text-align:center; padding: 15px 0; color:#64748b; font-size:11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
+                 st.markdown("<div style='text-align:center; padding: 15px 0; color:#64748b; font-size: 11px;'>No Sick Leave Data in range</div></div>", unsafe_allow_html=True)
 
             st.markdown("""
             <div class="content-box" style="background: #f0fdf4; border: 1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; padding: 10px 14px;">
