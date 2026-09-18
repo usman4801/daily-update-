@@ -499,7 +499,8 @@ else:
         }
         .tiny-home button:hover { background: transparent !important; transform: scale(1.1); color: #2563eb !important; }
 
-        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 10px; height: 76px; margin-bottom: 3px; position: relative; z-index: 1; overflow: hidden; }
+        .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 10px; height: 76px; margin-bottom: 3px; position: relative; z-index: 1; overflow: hidden; cursor: pointer; }
+        .kpi-card:hover { border-color: #2563eb; box-shadow: 0 4px 12px rgba(37,99,235,0.1); }
         .kpi-title { font-size: 10px; font-weight: 600; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .kpi-val { font-size: 19px; font-weight: 800; color: #0f172a; margin-top: 4px; display: flex; align-items: baseline; gap: 6px; }
         
@@ -877,9 +878,6 @@ else:
             st.markdown("### 📋 Leave Tracker")
             st.info("Leave Tracker scenario is coming soon.")
 
-        elif st.session_state.active_view == "Sick Leave":
-            if not sick_df.empty: st.dataframe(sick_df[['EMP Name', 'Department', 'Date', 'SL_Pattern']].sort_values(by='Date', ascending=False).reset_index(drop=True), use_container_width=True, height=400)
-            else: st.info("No sick leave records found.")
         elif st.session_state.active_view == "Sick Leave Pattern":
             st.markdown("### 🔍 Sick Leave Pattern Analysis (Near Week-Off & Consecutive)")
             tab1, tab2 = st.tabs(["🏖️ SL Near Week-Off", "🗓️ Consecutive SL Events"])
@@ -913,12 +911,15 @@ else:
 
         st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
-        # ===== FULL-WIDTH TILE ROW: 6 EQUAL-SIZE TILES =====
+        # ===== FULL-WIDTH TILE ROW: 6 EQUAL-SIZE TILES WITH DIRECT CLICK FUNCTIONALITY =====
         k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
 
         with k1:
+            if st.button("UPL Report", key="tile_upl", use_container_width=True, help="Click to view details"):
+                toggle_view("UPL Report")
+                st.rerun()
             st.markdown(f"""
-            <div class="kpi-card">
+            <div class="kpi-card" onclick="window.location.reload();">
                 <div style="display:flex; justify-content:space-between;">
                     <span class="kpi-title">UPL Report</span>
                     <span style="background:#f5f3ff; color:#7c3aed; padding:4px 6px; border-radius:6px; font-size:12px;">📉</span>
@@ -926,13 +927,12 @@ else:
                 <div class="kpi-val">{total_upl_metric:,}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_upl", on_click=toggle_view, args=("UPL Report",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("👁️ View Details", key="btn_upl", on_click=toggle_view, args=("UPL Report",), use_container_width=True):
+                pass
 
         with k2:
             st.markdown(f"""
-            <div class="kpi-card">
+            <div class="kpi-card" onclick="">
                 <div style="display:flex; justify-content:space-between;">
                     <span class="kpi-title">Mispunches</span>
                     <span style="background:#fef2f2; color:#ef4444; padding:4px 6px; border-radius:6px; font-size:12px;">⚠️</span>
@@ -940,9 +940,8 @@ else:
                 <div class="kpi-val">{len(mispunches_df):,}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_mispunches", on_click=toggle_view, args=("Mispunches",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("👁️ View Details", key="btn_mispunches", on_click=toggle_view, args=("Mispunches",), use_container_width=True):
+                pass
 
         with k3:
             st.markdown(f"""
@@ -954,9 +953,8 @@ else:
                 <div class="kpi-val">{len(repeated_mispunches_df):,}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_rep_mispunches", on_click=toggle_view, args=("Repeated Mispunches",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("👁️ View Details", key="btn_rep_mispunches", on_click=toggle_view, args=("Repeated Mispunches",), use_container_width=True):
+                pass
 
         with k4:
             st.markdown(f"""
@@ -968,9 +966,8 @@ else:
                 <div class="kpi-val">{pattern_wo_linked + pattern_consec:,}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_sl_pattern", on_click=toggle_view, args=("Sick Leave Pattern",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("👁️ View Details", key="btn_sl_pattern", on_click=toggle_view, args=("Sick Leave Pattern",), use_container_width=True):
+                pass
 
         with k5:
             st.markdown(f"""
@@ -982,9 +979,8 @@ else:
                 <div class="kpi-val">{len(defaulters_df):,}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_defaulter_hours", on_click=toggle_view, args=("Defaulter Hours",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("👁️ View Details", key="btn_defaulter_hours", on_click=toggle_view, args=("Defaulter Hours",), use_container_width=True):
+                pass
 
         with k6:
             st.markdown(f"""
@@ -996,9 +992,8 @@ else:
                 <div class="kpi-val">0</div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("<div class='btn-view-details'>", unsafe_allow_html=True)
-            st.button("👁️ View Details", key="btn_leave_tracker", on_click=toggle_view, args=("Leave Tracker",), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("👁️ View Details", key="btn_leave_tracker", on_click=toggle_view, args=("Leave Tracker",), use_container_width=True):
+                pass
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
