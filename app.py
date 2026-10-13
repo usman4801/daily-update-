@@ -379,7 +379,7 @@ CSS = """
 :root { --pk-gap: clamp(5px, .45vw, 10px); --pk-green: #2fa84f; }
 
 /* Full-width canvas */
-.block-container { padding: 2.5rem 1.25rem 1.5rem; max-width: 100% !important; }
+.block-container { padding: .6rem 1.25rem 1.5rem; max-width: 100% !important; }
 
 .peak-title { margin: 0; font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
 .peak-sub   { margin: .1rem 0 .9rem; opacity: .7; font-size: .9rem; }
@@ -446,8 +446,8 @@ CSS = """
 }
 
 /* ---- Capsules on top (buttons) ---- */
-.st-key-pk_tabs { margin-bottom: 0; }
-.pk-hbanner { display: block; height: 58px; width: auto; max-width: 100%; border-radius: 10px; }
+.st-key-pk_tabs { margin-bottom: -.4rem; }
+.pk-hbanner { display: block; height: 58px; width: auto; max-width: 100%; margin-left: auto; border-radius: 10px; }
 .st-key-pk_tabs button {
     border-radius: 999px !important; min-height: 0 !important; padding: .3rem 1.1rem !important;
     background: var(--pk-green) !important; border: 1px solid var(--pk-green) !important;
