@@ -2,13 +2,16 @@
 Peak Dashboard
 ==============
 Everything is in this one file (poster artwork is embedded at the bottom).
-Top   : small capsules -> [Peak Tracker] [Auto Email] (each opens as a pop-up)
+Top   : small capsules -> [Peak Tracker] [Auto Email] [Site] [Peak Gallery]
 Below : the calendar, always visible. It is poster-style; every game card is clickable on its own
-        and opens a modal to assign VPOC + HR.
+        and opens a modal to assign the Sender, VPOC and HR.
+
+Sites : DXB5, DXB3 and AUH1 are kept completely separate. Each site has its own SQLite file
+        (data/<SITE>/peak_dashboard.db) with its own tables: scans, VPOC assignments, email log, gallery.
 
 Requirements : streamlit >= 1.39, pandas
-Run          : streamlit run peak_dashboard.py
-Secrets      : .streamlit/secrets.toml  ->  [smtp] host / port / password
+Run          : streamlit run app.py
+Secrets      : .streamlit/secrets.toml  ->  [smtp] host / port / password   (optional: user)
 """
 
 import html
@@ -17,6 +20,7 @@ import re
 import smtplib
 import sqlite3
 import ssl
+import threading
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta
 from email.message import EmailMessage
@@ -24,6 +28,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Poster artwork (side banner + one picture per day, cut from Peak_26.png) is embedded at the very bottom of this file.
 
@@ -32,10 +37,18 @@ import streamlit as st
 # =============================================================================
 APP_TITLE = "Peak 2026 Dashboard"
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "peak_dashboard.db"
 
-SENDER_EMAIL = "javmuhak@amazon.ae"
-STATUS_OPTIONS = ["Participant", "🏆 Winner"]
+# ---- Sites: every site gets its own folder + its own database file ----------
+SITES = ["DXB5", "DXB3", "AUH1"]
+DEFAULT_SITE = SITES[0]
+DATA_DIR = BASE_DIR / "data"                         # data/<SITE>/peak_dashboard.db
+LEGACY_DB_PATH = BASE_DIR / "peak_dashboard.db"      # the old single-site database (if you have one)
+LEGACY_DB_SITE = "DXB5"                              # site that inherits the old database, one time only
+
+DEFAULT_SENDER_EMAIL = "javmuhak@amazon.ae"          # pre-filled in "Sender Email"
+WINNER = "🏆 Winner"
+PARTICIPANT = "Participant"
+STATUS_OPTIONS = [PARTICIPANT, WINNER]
 TABS = ["Calendar", "Peak Tracker", "Auto Email"]
 
 BADGE_PATTERN = re.compile(r"^[A-Z0-9_-]{1,32}$")
@@ -88,84 +101,207 @@ for _i, _key in enumerate(SCHEDULE):
     if _key in GAMES:
         GAME_DATES.setdefault(_key, []).append(START_DATE + timedelta(days=_i))
 
+# ---- Tracker entries: one per game *and* calendar date, e.g. "Ring Toss (30-10-2026)" ----
+OCC_IDS = [f"{k}|{(START_DATE + timedelta(days=i)).isoformat()}"
+           for i, k in enumerate(SCHEDULE) if k in GAMES]
+
+
+def occ_id(game_id: str, day) -> str:
+    iso = day if isinstance(day, str) else day.isoformat()
+    return f"{game_id}|{iso}"
+
+
+def split_occ(occ: str):
+    game_id, iso = occ.split("|")
+    return game_id, date.fromisoformat(iso)
+
+
+def occ_label(occ: str) -> str:
+    """Game name with its calendar date in brackets: Game Name (DD-MM-YYYY)."""
+    game_id, day = split_occ(occ)
+    return f"{GAMES[game_id]} ({day.strftime('%d-%m-%Y')})"
+
+
+def default_occ() -> str:
+    """Today's game if there is one, else the next upcoming one, else the first one."""
+    today = date.today()
+    upcoming = [o for o in OCC_IDS if split_occ(o)[1] >= today]
+    return upcoming[0] if upcoming else OCC_IDS[0]
+
+
 logger = logging.getLogger("peak_dashboard")
 
 
 # =============================================================================
-# 2. DATABASE LAYER
+# 2. DATABASE LAYER  (one SQLite file per site -> sites never share a table)
 # =============================================================================
-@contextmanager
-def db():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+_LOCK = threading.RLock()     # one shared connection per site, so writes are serialised
 
 
-@st.cache_resource
-def init_db() -> bool:
-    with db() as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS vpoc_assignments (
-                game_id     TEXT PRIMARY KEY,
-                vpoc_name   TEXT NOT NULL,
-                vpoc_email  TEXT NOT NULL,
-                hr_name     TEXT NOT NULL,
-                hr_email    TEXT NOT NULL,
-                assigned_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS scans (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                badge_id   TEXT NOT NULL,
-                game_id    TEXT NOT NULL,
-                status     TEXT NOT NULL DEFAULT 'Participant',
-                scanned_at TEXT NOT NULL,
-                UNIQUE (badge_id, game_id)
-            );
-            CREATE INDEX IF NOT EXISTS idx_scans_game ON scans (game_id);
-            CREATE TABLE IF NOT EXISTS email_log (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                game_id    TEXT NOT NULL,
-                run_date   TEXT NOT NULL,
-                recipients TEXT NOT NULL,
-                ok         INTEGER NOT NULL,
-                detail     TEXT NOT NULL DEFAULT '',
-                sent_at    TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_email_game ON email_log (game_id, run_date);
-            """
-        )
-    return True
+def current_site() -> str:
+    site = st.session_state.get("site", DEFAULT_SITE)
+    return site if site in SITES else DEFAULT_SITE
+
+
+def site_db_path(site: str) -> Path:
+    return DATA_DIR / site / "peak_dashboard.db"
 
 
 def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _columns(conn, table: str) -> set:
+    return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _init_schema(conn) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS vpoc_assignments (
+            game_id      TEXT PRIMARY KEY,
+            sender_email TEXT NOT NULL DEFAULT '',
+            vpoc_name    TEXT NOT NULL,
+            vpoc_email   TEXT NOT NULL,
+            hr_name      TEXT NOT NULL,
+            hr_email     TEXT NOT NULL,
+            assigned_at  TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS scans (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            badge_id   TEXT NOT NULL,
+            game_id    TEXT NOT NULL,
+            game_date  TEXT NOT NULL DEFAULT '',
+            status     TEXT NOT NULL DEFAULT 'Participant',
+            scanned_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS email_log (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_id    TEXT NOT NULL,
+            run_date   TEXT NOT NULL,
+            recipients TEXT NOT NULL,
+            ok         INTEGER NOT NULL,
+            detail     TEXT NOT NULL DEFAULT '',
+            sent_at    TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS gallery (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename    TEXT NOT NULL,
+            mime        TEXT NOT NULL,
+            data        BLOB NOT NULL,
+            uploaded_at TEXT NOT NULL
+        );
+        """
+    )
+    _migrate(conn)
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_scans_occ   ON scans (game_id, game_date);
+        CREATE INDEX IF NOT EXISTS idx_scans_badge ON scans (badge_id);
+        CREATE INDEX IF NOT EXISTS idx_email_game  ON email_log (game_id, run_date);
+        """
+    )
+
+
+def _migrate(conn) -> None:
+    """Upgrade a database created by the previous version (safe to run every time)."""
+    if "sender_email" not in _columns(conn, "vpoc_assignments"):
+        conn.execute("ALTER TABLE vpoc_assignments ADD COLUMN sender_email TEXT NOT NULL DEFAULT ''")
+
+    scans_sql = (conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='scans'").fetchone()[0] or "")
+    if "UNIQUE" in scans_sql.upper():
+        # Old table: UNIQUE (badge_id, game_id) and no date. Rebuild it without the constraint
+        # (duplicates are now handled in code, with the "Still want to add" override).
+        conn.executescript(
+            """
+            DROP INDEX IF EXISTS idx_scans_game;
+            ALTER TABLE scans RENAME TO scans_old;
+            CREATE TABLE scans (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                badge_id   TEXT NOT NULL,
+                game_id    TEXT NOT NULL,
+                game_date  TEXT NOT NULL DEFAULT '',
+                status     TEXT NOT NULL DEFAULT 'Participant',
+                scanned_at TEXT NOT NULL
+            );
+            INSERT INTO scans (id, badge_id, game_id, game_date, status, scanned_at)
+                SELECT id, badge_id, game_id, '', status, scanned_at FROM scans_old;
+            DROP TABLE scans_old;
+            """
+        )
+    elif "game_date" not in _columns(conn, "scans"):
+        conn.execute("ALTER TABLE scans ADD COLUMN game_date TEXT NOT NULL DEFAULT ''")
+
+    # Old rows have no date: give each one the scheduled date of its game (the scan day if it matches).
+    for r in conn.execute("SELECT id, game_id, scanned_at FROM scans WHERE game_date = ''").fetchall():
+        dates = GAME_DATES.get(r["game_id"], [])
+        if not dates:
+            continue
+        try:
+            scan_day = datetime.strptime(r["scanned_at"][:10], "%Y-%m-%d").date()
+        except ValueError:
+            scan_day = None
+        chosen = scan_day if scan_day in dates else dates[0]
+        conn.execute("UPDATE scans SET game_date = ? WHERE id = ?", (chosen.isoformat(), r["id"]))
+    conn.commit()
+
+
+@st.cache_resource(show_spinner=False)
+def get_conn(site: str) -> sqlite3.Connection:
+    """One long-lived connection per site (created once, shared by every session)."""
+    path = site_db_path(site)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # One-time hand-over of the old single-site database to LEGACY_DB_SITE (the original is kept).
+    if site == LEGACY_DB_SITE and not path.exists() and LEGACY_DB_PATH.exists():
+        src = sqlite3.connect(LEGACY_DB_PATH)
+        dst = sqlite3.connect(path)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+
+    conn = sqlite3.connect(path, timeout=10, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")     # far fewer disk syncs per write than FULL
+    conn.execute("PRAGMA busy_timeout=10000")
+    _init_schema(conn)
+    return conn
+
+
+@contextmanager
+def db():
+    """Connection of the currently selected site, guarded by a lock; commits on success."""
+    conn = get_conn(current_site())
+    with _LOCK:
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
 # ---- VPOC assignments --------------------------------------------------------
-def upsert_vpoc(game_id, vpoc_name, vpoc_email, hr_name, hr_email) -> None:
+def upsert_vpoc(game_id, sender_email, vpoc_name, vpoc_email, hr_name, hr_email) -> None:
     with db() as conn:
         conn.execute(
             """
             INSERT INTO vpoc_assignments
-                (game_id, vpoc_name, vpoc_email, hr_name, hr_email, assigned_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (game_id, sender_email, vpoc_name, vpoc_email, hr_name, hr_email, assigned_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(game_id) DO UPDATE SET
-                vpoc_name   = excluded.vpoc_name,
-                vpoc_email  = excluded.vpoc_email,
-                hr_name     = excluded.hr_name,
-                hr_email    = excluded.hr_email,
-                assigned_at = excluded.assigned_at
+                sender_email = excluded.sender_email,
+                vpoc_name    = excluded.vpoc_name,
+                vpoc_email   = excluded.vpoc_email,
+                hr_name      = excluded.hr_name,
+                hr_email     = excluded.hr_email,
+                assigned_at  = excluded.assigned_at
             """,
-            (game_id, vpoc_name, vpoc_email, hr_name, hr_email, _now()),
+            (game_id, sender_email, vpoc_name, vpoc_email, hr_name, hr_email, _now()),
         )
 
 
@@ -175,29 +311,36 @@ def get_all_vpocs() -> dict:
     return {r["game_id"]: dict(r) for r in rows}
 
 
-# ---- Scans -------------------------------------------------------------------
-def add_scan(badge_id: str, game_id: str) -> bool:
-    """False (nothing saved) if this badge already played this game."""
-    try:
-        with db() as conn:
-            conn.execute(
-                "INSERT INTO scans (badge_id, game_id, scanned_at) VALUES (?, ?, ?)",
-                (badge_id, game_id, _now()),
-            )
-        return True
-    except sqlite3.IntegrityError:
-        return False
+# ---- Scans (participants and winners) ----------------------------------------
+def find_badge(badge_id: str) -> list:
+    """Every entry of this login on the current site, any game, any date."""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, game_id, game_date, status FROM scans WHERE badge_id = ? ORDER BY id",
+            (badge_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
-def get_scans(game_id: str) -> pd.DataFrame:
+def add_scan(badge_id: str, occ: str, status: str = PARTICIPANT) -> None:
+    game_id, day = split_occ(occ)
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO scans (badge_id, game_id, game_date, status, scanned_at) VALUES (?, ?, ?, ?, ?)",
+            (badge_id, game_id, day.isoformat(), status, _now()),
+        )
+
+
+def get_scans(occ: str) -> pd.DataFrame:
+    game_id, day = split_occ(occ)
     with db() as conn:
         return pd.read_sql_query(
             """
             SELECT id, badge_id AS "Badge ID", status AS "Status", scanned_at AS "Scanned at"
-            FROM scans WHERE game_id = ? ORDER BY id ASC
+            FROM scans WHERE game_id = ? AND game_date = ? ORDER BY id ASC
             """,
             conn,
-            params=(game_id,),
+            params=(game_id, day.isoformat()),
         )
 
 
@@ -236,6 +379,31 @@ def was_sent(game_id: str, run_date: date) -> bool:
     return row is not None
 
 
+# ---- Gallery (per site) ------------------------------------------------------
+GALLERY_TYPES = ["png", "jpg", "jpeg", "webp", "gif"]
+GALLERY_MAX_MB = 8
+
+
+def add_image(filename: str, mime: str, data: bytes) -> None:
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO gallery (filename, mime, data, uploaded_at) VALUES (?, ?, ?, ?)",
+            (filename, mime or "image/png", data, _now()),
+        )
+
+
+def list_images() -> list:
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, filename, mime, data, uploaded_at FROM gallery ORDER BY id DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_image(image_id: int) -> None:
+    with db() as conn:
+        conn.execute("DELETE FROM gallery WHERE id = ?", (image_id,))
+
+
 # =============================================================================
 # 3. EMAIL (smtplib)
 # =============================================================================
@@ -262,20 +430,20 @@ def build_reminder_email(game_name: str, vpoc_name: str, hr_name: str, run_date:
     return subject, text, body
 
 
-def send_email(to: list, cc: list, subject: str, text: str, html_body: str):
+def send_email(sender: str, to: list, cc: list, subject: str, text: str, html_body: str):
     """Send through SMTP using the password stored in st.secrets. Returns (ok, detail)."""
     try:
         cfg = st.secrets["smtp"]
         host = cfg["host"]
         port = int(cfg.get("port", 587))
-        user = cfg.get("user", SENDER_EMAIL)
+        user = cfg.get("user", sender)
         password = cfg["password"]
     except (KeyError, FileNotFoundError):
         return False, "SMTP settings missing: add [smtp] host and password to .streamlit/secrets.toml."
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = SENDER_EMAIL
+    msg["From"] = sender
     msg["To"] = ", ".join(to)
     if cc:
         msg["Cc"] = ", ".join(cc)
@@ -295,15 +463,19 @@ def send_email(to: list, cc: list, subject: str, text: str, html_body: str):
         return False, f"{type(exc).__name__}: {exc}"
 
 
+def sender_for(assignment: dict) -> str:
+    return (assignment.get("sender_email") or "").strip() or DEFAULT_SENDER_EMAIL
+
+
 def notify_vpoc(game_id: str, run_date: date):
-    """Email the assigned VPOC (HR in cc) that run_date is their day. Logs the attempt."""
+    """Email the assigned VPOC (HR in cc), from the assigned Sender Email. Logs the attempt."""
     assignment = get_all_vpocs().get(game_id)
     if not assignment:
         return False, "No VPOC assigned for this game."
     subject, text, body = build_reminder_email(
         GAMES[game_id], assignment["vpoc_name"], assignment["hr_name"], run_date)
     to, cc = [assignment["vpoc_email"]], [assignment["hr_email"]]
-    ok, detail = send_email(to, cc, subject, text, body)
+    ok, detail = send_email(sender_for(assignment), to, cc, subject, text, body)
     log_email(game_id, run_date, to + cc, ok, detail)
     return ok, detail
 
@@ -312,47 +484,93 @@ def notify_vpoc(game_id: str, run_date: date):
 # 4. STATE + CALLBACKS
 # =============================================================================
 def init_state() -> None:
-    st.session_state.setdefault("active_game", next(iter(GAMES)))
-    st.session_state.setdefault("active_date", "")          # the one calendar block that was clicked
+    st.session_state.setdefault("site", DEFAULT_SITE)
+    st.session_state.setdefault("active_occ", default_occ())    # "<game_id>|<YYYY-MM-DD>"
+    st.session_state.setdefault("active_date", "")              # the one calendar block that was clicked
     st.session_state.setdefault("scan_feedback", None)
+    st.session_state.setdefault("scan_dup", None)               # pending "Duplicate entry" decision
     st.session_state.setdefault("pending_toast", None)
     st.session_state.setdefault("editor_version", 0)
     st.session_state.setdefault("editor_key", "")
     st.session_state.setdefault("editor_ids", [])
-    st.session_state.setdefault("right_tab", TABS[0])
+    st.session_state.setdefault("gallery_ver", 0)
+
+
+def clear_scan_state() -> None:
+    st.session_state.scan_feedback = None
+    st.session_state.scan_dup = None
+
+
+def on_site_change() -> None:
+    clear_scan_state()
+    st.session_state.editor_version += 1
 
 
 def select_game(game_id: str, day_iso: str = "") -> None:
-    st.session_state.active_game = game_id
+    """Calendar click: remember which game *and which date* was clicked."""
+    st.session_state.active_occ = occ_id(game_id, day_iso)
     st.session_state.active_date = day_iso
+    clear_scan_state()
 
 
 def sync_tracker_game() -> None:
-    st.session_state.active_game = st.session_state.tracker_game_select
-    st.session_state.active_date = ""
+    occ = st.session_state.tracker_game_select
+    st.session_state.active_occ = occ
+    st.session_state.active_date = split_occ(occ)[1].isoformat()
+    clear_scan_state()
 
 
-def handle_scan() -> None:
-    raw = st.session_state.badge_input
-    st.session_state.badge_input = ""
+def process_scan(raw: str, mode: str) -> None:
+    """Handle one scanned/typed login. Runs inside the tracker's own fragment run (no full rerun)."""
     badge = raw.strip().upper()
-    game_id = st.session_state.active_game
-
     if not badge:
         return
+    occ = st.session_state.active_occ
+    game_id, day = split_occ(occ)
+    st.session_state.scan_dup = None
+
     if not BADGE_PATTERN.match(badge):
         st.session_state.scan_feedback = ("warning", f"“{badge}” is not a valid badge ID. Scan again.")
-        st.toast("Invalid badge ID", icon="⚠️")
         return
 
-    if add_scan(badge, game_id):
-        st.session_state.scan_feedback = ("success", f"Badge {badge} added to {GAMES[game_id]}.")
-        st.toast(f"Badge {badge} added", icon="✅")
-    else:
-        st.session_state.scan_feedback = (
-            "error",
-            f"DUPLICATE: badge {badge} has already played {GAMES[game_id]}. Nothing was saved.")
-        st.toast(f"Duplicate: {badge}", icon="🚫")
+    status = WINNER if mode == "Winner" else PARTICIPANT
+    existing = find_badge(badge)
+    here = next((r for r in existing
+                 if r["game_id"] == game_id and r["game_date"] == day.isoformat()), None)
+
+    # Already a participant of this game/date and now being marked as winner -> just upgrade.
+    if here and status == WINNER and here["status"] != WINNER:
+        update_status(here["id"], WINNER)
+        st.session_state.scan_feedback = ("success", f"{badge} is now a Winner of {occ_label(occ)}.")
+        st.toast(f"{badge} marked as Winner", icon="🏆")
+        return
+
+    if existing:
+        where = "; ".join(f"{GAMES.get(r['game_id'], r['game_id'])} "
+                          f"({_fmt_iso(r['game_date'])}, {r['status'].replace('🏆 ', '')})"
+                          for r in existing[:3])
+        if len(existing) > 3:
+            where += f"; +{len(existing) - 3} more"
+        st.session_state.scan_dup = {
+            "badge": badge, "occ": occ, "status": status, "where": where, "site": current_site()}
+        return
+
+    add_scan(badge, occ, status)
+    st.session_state.scan_feedback = ("success", f"{badge} added as {status.replace('🏆 ', '')} "
+                                                  f"to {occ_label(occ)}.")
+    st.toast(f"{badge} added", icon="✅")
+
+
+def force_add() -> None:
+    """'Still want to add' button: save the pending duplicate anyway."""
+    dup = st.session_state.scan_dup
+    st.session_state.scan_dup = None
+    if not dup or dup["site"] != current_site():
+        return
+    add_scan(dup["badge"], dup["occ"], dup["status"])
+    st.session_state.scan_feedback = (
+        "success", f"{dup['badge']} added anyway to {occ_label(dup['occ'])}.")
+    st.toast(f"{dup['badge']} added", icon="✅")
 
 
 def handle_status_edit() -> None:
@@ -366,7 +584,14 @@ def handle_status_edit() -> None:
             changed += 1
     if changed:
         st.session_state.editor_version += 1
-        st.session_state.pending_toast = ("Result saved", "💾")
+        st.toast("Result saved", icon="💾")
+
+
+def _fmt_iso(iso: str) -> str:
+    try:
+        return date.fromisoformat(iso).strftime("%d-%m-%Y")
+    except ValueError:
+        return iso or "no date"
 
 
 # =============================================================================
@@ -503,25 +728,32 @@ def vpoc_dialog(game_id: str, when: date) -> None:
     existing = get_all_vpocs().get(game_id, {})
     st.markdown(f"**{GAMES[game_id]}**  \n{when.strftime('%A, %d %b %Y')}")
     runs = ", ".join(d.strftime("%d %b") for d in GAME_DATES.get(game_id, []))
-    st.caption(f"This game runs on: {runs}. One VPOC and HR cover all of its dates.")
+    st.caption(f"Site: {current_site()}. This game runs on: {runs}. "
+               f"One VPOC and HR cover all of its dates.")
 
-    with st.form(f"vpoc_form_{game_id}"):
+    with st.form(f"vpoc_form_{current_site()}_{game_id}"):
+        sender_email = st.text_input(
+            "Sender Email", value=existing.get("sender_email") or DEFAULT_SENDER_EMAIL,
+            help="The address the notification is sent from.")
         c1, c2 = st.columns(2)
-        vpoc_name = c1.text_input("VPOC name", value=existing.get("vpoc_name", ""))
-        vpoc_email = c2.text_input("VPOC email", value=existing.get("vpoc_email", ""))
-        hr_name = c1.text_input("HR name", value=existing.get("hr_name", ""))
-        hr_email = c2.text_input("HR email", value=existing.get("hr_email", ""))
+        vpoc_name = c1.text_input("VPOC Name", value=existing.get("vpoc_name", ""))
+        vpoc_email = c2.text_input(
+            "VPOC Email", value=existing.get("vpoc_email", ""),
+            help="The recipient who receives the notification.")
+        hr_name = c1.text_input("HR Name", value=existing.get("hr_name", ""))
+        hr_email = c2.text_input("HR Email (cc)", value=existing.get("hr_email", ""))
         submitted = st.form_submit_button("Save assignment", type="primary", use_container_width=True)
 
     if not submitted:
         return
 
-    values = [v.strip() for v in (vpoc_name, vpoc_email, hr_name, hr_email)]
+    values = [v.strip() for v in (sender_email, vpoc_name, vpoc_email, hr_name, hr_email)]
     if not all(values):
-        st.error("Fill in all four fields.")
+        st.error("Fill in all five fields.")
         return
-    if not (EMAIL_PATTERN.match(values[1]) and EMAIL_PATTERN.match(values[3])):
-        st.error("Enter valid email addresses for the VPOC and HR.")
+    if not (EMAIL_PATTERN.match(values[0]) and EMAIL_PATTERN.match(values[2])
+            and EMAIL_PATTERN.match(values[4])):
+        st.error("Enter valid email addresses for the Sender, the VPOC and the HR.")
         return
 
     upsert_vpoc(game_id, *values)
@@ -564,7 +796,6 @@ def card_html(day: date, item: dict, *, ratio: float, vpoc_set: bool,
 def render_calendar() -> None:
     vpocs = get_all_vpocs()
     today = date.today()
-    active_game = st.session_state.active_game
     active_date = st.session_state.active_date
 
     with st.container(key="pk_cal"):
@@ -600,37 +831,81 @@ def render_calendar() -> None:
 
 
 
+
 # ---- Tab: Peak Tracker -------------------------------------------------------
+def _focus_badge_input() -> None:
+    """Put the cursor back into the badge box after every scan (the scanner types into it)."""
+    try:
+        components.html(
+            """<script>
+            setTimeout(function () {
+              try {
+                var el = window.parent.document.querySelector('input[aria-label="Scan employee badge"]');
+                if (el) { el.focus(); }
+              } catch (e) {}
+            }, 120);
+            </script>""",
+            height=0,
+        )
+    except Exception:          # cosmetic only: never let autofocus break the tracker
+        pass
+
+
 def render_tracker() -> None:
-    # The selectbox only exists while this tab is open, so re-seed its value from the
-    # shared active_game (also updated by calendar clicks) on every run.
-    st.session_state.tracker_game_select = st.session_state.active_game
-    game_id = st.selectbox(
-        "Game being tracked", options=list(GAMES), format_func=GAMES.get,
+    site = current_site()
+    st.caption(f"Site: {site}")
+
+    # The selectbox only exists while this dialog is open, so re-seed its value from the shared
+    # active_occ (also updated by calendar clicks) on every run.
+    if st.session_state.active_occ not in OCC_IDS:
+        st.session_state.active_occ = default_occ()
+    st.session_state.tracker_game_select = st.session_state.active_occ
+    occ = st.selectbox(
+        "Game being tracked", options=OCC_IDS, format_func=occ_label,
         key="tracker_game_select", on_change=sync_tracker_game,
     )
 
-    st.text_input(
-        "Scan employee badge", key="badge_input", on_change=handle_scan,
-        placeholder="Click here, then scan the badge",
-    )
+    mode = st.radio("Add scanned employee as", ["Participant", "Winner"], horizontal=True,
+                    key="scan_mode", help="Choose Winner to save the next scanned logins as winners.")
 
+    # A form: nothing runs while the scanner types; one clean run happens on Enter.
+    with st.form("scan_form", clear_on_submit=True, border=False):
+        raw = st.text_input("Scan employee badge", key="badge_input",
+                            placeholder="Click here, then scan the badge")
+        submitted = st.form_submit_button("Add", type="primary")
+    if submitted:
+        process_scan(raw, mode)
+
+    # --- messages ---
+    dup = st.session_state.scan_dup
+    if dup and dup["site"] == site:
+        w1, w2 = st.columns([3, 1], vertical_alignment="center")
+        w1.warning(f"**Duplicate entry**: {dup['badge']} is already in the {site} database "
+                   f"({dup['where']}).")
+        w2.button("Still want to add", key="force_add_btn", on_click=force_add,
+                  use_container_width=True)
     feedback = st.session_state.scan_feedback
     if feedback:
         kind, message = feedback
         {"success": st.success, "error": st.error, "warning": st.warning}[kind](message)
 
-    df = get_scans(game_id)
+    # --- numbers + table ---
+    df = get_scans(occ)
+    winners = df[df["Status"] == WINNER] if not df.empty else df
     m1, m2 = st.columns(2)
     m1.metric("Participants", len(df))
-    m2.metric("Winners", int((df["Status"] == "🏆 Winner").sum()) if not df.empty else 0)
+    m2.metric("Winners", len(winners))
 
     if df.empty:
-        st.info(f"No badges scanned for {GAMES[game_id]} yet. Scan the first one above.")
+        st.info(f"No badges scanned for {occ_label(occ)} yet. Scan the first one above.")
+        _focus_badge_input()
         return
 
+    if not winners.empty:
+        st.caption("🏆 Winners: " + ", ".join(winners["Badge ID"]))
+
     st.session_state.editor_ids = df["id"].tolist()
-    st.session_state.editor_key = f"editor_{game_id}_{st.session_state.editor_version}_{len(df)}"
+    st.session_state.editor_key = f"editor_{site}_{occ}_{st.session_state.editor_version}_{len(df)}"
 
     st.data_editor(
         df,
@@ -646,6 +921,7 @@ def render_tracker() -> None:
                 options=STATUS_OPTIONS, required=True),
         },
     )
+    _focus_badge_input()
 
 
 # ---- Tab: Auto Email ---------------------------------------------------------
@@ -658,7 +934,7 @@ def render_email() -> None:
     today = date.today()
 
     if not vpocs:
-        st.info("No VPOCs assigned yet. Click a game in the calendar to assign one.")
+        st.info(f"No VPOCs assigned yet for {current_site()}. Click a game in the calendar to assign one.")
         return
 
     # --- Overview table ---
@@ -673,6 +949,7 @@ def render_email() -> None:
             "Dates": _fmt_dates(dates),
             "Next run": (upcoming[0] if upcoming else dates[-1]).strftime("%d %b %Y"),
             "Status": status,
+            "Sender": sender_for(a),
             "VPOC": f'{a["vpoc_name"]} ({a["vpoc_email"]})',
             "HR": f'{a["hr_name"]} ({a["hr_email"]})',
             "Last email": (f'{last["sent_at"]} ' + ("✅" if last["ok"] else "❌")) if last else "—",
@@ -691,7 +968,7 @@ def render_email() -> None:
     a = vpocs[game_id]
     subject, text, _ = build_reminder_email(GAMES[game_id], a["vpoc_name"], a["hr_name"], run_date)
     with st.expander("Preview email"):
-        st.markdown(f"**From:** {SENDER_EMAIL}  \n**To:** {a['vpoc_email']}  \n"
+        st.markdown(f"**From:** {sender_for(a)}  \n**To:** {a['vpoc_email']}  \n"
                     f"**Cc:** {a['hr_email']}  \n**Subject:** {subject}")
         st.text(text)
 
@@ -712,7 +989,6 @@ def render_email() -> None:
             (st.success if ok else st.error)(
                 f"{GAMES[gid]}: sent." if ok else f"{GAMES[gid]}: {detail}")
 
-
 @st.dialog("Peak Tracker", width="large")
 def tracker_dialog() -> None:
     render_tracker()
@@ -723,17 +999,64 @@ def email_dialog() -> None:
     render_email()
 
 
+@st.dialog("Peak Gallery", width="large")
+def gallery_dialog() -> None:
+    st.caption(f"Site: {current_site()}. Save pictures from the Peak events here. "
+               f"Everyone using the dashboard can see them (this gallery is only for {current_site()}).")
+    files = st.file_uploader(
+        "Add images", type=GALLERY_TYPES, accept_multiple_files=True,
+        key=f"gallery_upload_{st.session_state.gallery_ver}",
+    )
+    if files and st.button("💾 Save to gallery", type="primary", key="gallery_save"):
+        saved, skipped = 0, 0
+        for f in files:
+            if f.size > GALLERY_MAX_MB * 1024 * 1024:
+                skipped += 1
+                continue
+            add_image(f.name, f.type, f.getvalue())
+            saved += 1
+        st.session_state.gallery_ver += 1                       # clears the uploader
+        msg = f"{saved} image(s) saved to the gallery."
+        if skipped:
+            msg += f" {skipped} skipped (over {GALLERY_MAX_MB} MB)."
+        st.toast(msg, icon="🖼️")
+        st.rerun(scope="fragment")
+
+    images = list_images()
+    if not images:
+        st.info("No images yet. Add the first one above.")
+        return
+    st.markdown(f"**{len(images)} image(s)**")
+    cols = st.columns(3)
+    for n, img in enumerate(images):
+        with cols[n % 3]:
+            with st.container(border=True):
+                st.image(img["data"], use_container_width=True)
+                st.caption(f'{img["filename"]} · {img["uploaded_at"][:10]}')
+                d1, d2 = st.columns(2)
+                d1.download_button("⬇ Save", img["data"], file_name=img["filename"],
+                                   mime=img["mime"], key=f'gal_dl_{img["id"]}',
+                                   use_container_width=True)
+                d2.button("🗑 Delete", key=f'gal_del_{img["id"]}', use_container_width=True,
+                          on_click=delete_image, args=(img["id"],))
+
+
 def render_right_panel() -> None:
     """Small capsules on top (Peak Tracker / Auto Email open as pop-ups); the calendar is always shown below."""
     with st.container(key="pk_tabs"):
-        c1, c2, c3 = st.columns([1.3, 1.3, 8], gap="small", vertical_alignment="center")
+        c1, c2, c_site, c3, c4, _ = st.columns(
+            [1.3, 1.3, 1.6, 2.9, 1.4, 3.4], gap="small", vertical_alignment="center")
         if c1.button("Peak Tracker", key="pk_pill_tracker"):
             tracker_dialog()
         if c2.button("Auto Email", key="pk_pill_email"):
             email_dialog()
+        c_site.selectbox("Site", options=SITES, key="site", on_change=on_site_change,
+                         format_func=lambda s: f"Site: {s}", label_visibility="collapsed")
         if HBANNER_B64:
             c3.markdown(f'<img class="pk-hbanner" alt="Peak 2026 - Oct-Dec \'26" '
                         f'src="data:image/webp;base64,{HBANNER_B64}">', unsafe_allow_html=True)
+        if c4.button("Peak Gallery", key="pk_pill_gallery"):
+            gallery_dialog()
     render_calendar()
 
 
@@ -742,8 +1065,8 @@ def render_right_panel() -> None:
 # =============================================================================
 def main() -> None:
     st.set_page_config(page_title=APP_TITLE, page_icon="⛰️", layout="wide")
-    init_db()
     init_state()
+    get_conn(current_site())          # opens (and creates / upgrades) the selected site's database once
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(build_banner_css(), unsafe_allow_html=True)
 
