@@ -2,8 +2,8 @@
 Peak Dashboard
 ==============
 Everything is in this one file (poster artwork is embedded at the bottom).
-Top   : small capsules -> [Calendar] [Peak Tracker] [Auto Email]
-Below : the selected view. The calendar is poster-style; every game card is clickable on its own
+Top   : small capsules -> [Peak Tracker] [Auto Email] (each opens as a pop-up)
+Below : the calendar, always visible. It is poster-style; every game card is clickable on its own
         and opens a modal to assign VPOC + HR.
 
 Requirements : streamlit >= 1.39, pandas
@@ -445,6 +445,16 @@ CSS = """
     transform: translateY(-3px); box-shadow: 0 8px 18px rgba(20, 60, 90, .22);
 }
 
+/* ---- Capsules on top (buttons) ---- */
+.st-key-pk_tabs { margin-bottom: .4rem; }
+.st-key-pk_tabs button {
+    border-radius: 999px !important; min-height: 0 !important; padding: .3rem 1.1rem !important;
+    background: var(--pk-green) !important; border: 1px solid var(--pk-green) !important;
+    box-shadow: 0 2px 8px rgba(47, 168, 79, .30); white-space: nowrap;
+}
+.st-key-pk_tabs button p { color: #fff !important; font-weight: 700; font-size: .82rem; margin: 0; }
+.st-key-pk_tabs button:hover { filter: brightness(.93); }
+
 /* ---- Tablet / pill tabs (st.radio) ---- */
 .st-key-pk_tabs [role="radiogroup"] { display: flex; flex-direction: row; gap: 6px; flex-wrap: wrap; }
 .st-key-pk_tabs label[data-baseweb="radio"] {
@@ -704,19 +714,25 @@ def render_email() -> None:
                 f"{GAMES[gid]}: sent." if ok else f"{GAMES[gid]}: {detail}")
 
 
+@st.dialog("Peak Tracker", width="large")
+def tracker_dialog() -> None:
+    render_tracker()
+
+
+@st.dialog("Auto Email", width="large")
+def email_dialog() -> None:
+    render_email()
+
+
 def render_right_panel() -> None:
+    """Small capsules on top (Peak Tracker / Auto Email open as pop-ups); the calendar is always shown below."""
     with st.container(key="pk_tabs"):
-        st.radio("View", TABS, key="right_tab", horizontal=True, label_visibility="collapsed")
-    st.write("")
-    tab = st.session_state.right_tab
-    if tab == "Calendar":
-        render_calendar()
-    elif tab == "Peak Tracker":
-        panel, _ = st.columns([1.4, 2.6])
-        with panel:
-            render_tracker()
-    else:
-        render_email()
+        c1, c2, _ = st.columns([1.3, 1.3, 8], gap="small")
+        if c1.button("Peak Tracker", key="pk_pill_tracker"):
+            tracker_dialog()
+        if c2.button("Auto Email", key="pk_pill_email"):
+            email_dialog()
+    render_calendar()
 
 
 # =============================================================================
