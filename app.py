@@ -102,8 +102,9 @@ for _i, _key in enumerate(SCHEDULE):
         GAME_DATES.setdefault(_key, []).append(START_DATE + timedelta(days=_i))
 
 # ---- Tracker entries: one per game *and* calendar date, e.g. "Ring Toss (30-10-2026)" ----
+# Every day on the calendar is listed (games, raffle, festivals, food days...), in calendar order.
 OCC_IDS = [f"{k}|{(START_DATE + timedelta(days=i)).isoformat()}"
-           for i, k in enumerate(SCHEDULE) if k in GAMES]
+           for i, k in enumerate(SCHEDULE)]
 
 
 def occ_id(game_id: str, day) -> str:
@@ -119,11 +120,11 @@ def split_occ(occ: str):
 def occ_label(occ: str) -> str:
     """Game name with its calendar date in brackets: Game Name (DD-MM-YYYY)."""
     game_id, day = split_occ(occ)
-    return f"{GAMES[game_id]} ({day.strftime('%d-%m-%Y')})"
+    return f"{ITEMS[game_id]['name']} ({day.strftime('%d-%m-%Y')})"
 
 
 def default_occ() -> str:
-    """Today's game if there is one, else the next upcoming one, else the first one."""
+    """Today's calendar entry, else the next upcoming one, else the first one."""
     today = date.today()
     upcoming = [o for o in OCC_IDS if split_occ(o)[1] >= today]
     return upcoming[0] if upcoming else OCC_IDS[0]
@@ -329,19 +330,37 @@ def add_scan(badge_id: str, occ: str, status: str = PARTICIPANT) -> None:
             "INSERT INTO scans (badge_id, game_id, game_date, status, scanned_at) VALUES (?, ?, ?, ?, ?)",
             (badge_id, game_id, day.isoformat(), status, _now()),
         )
+    export_tracker_csv()
 
 
-def get_scans(occ: str) -> pd.DataFrame:
-    game_id, day = split_occ(occ)
+def get_tracker() -> pd.DataFrame:
+    """The ONE tracker list of the current site: every login, every game, every date."""
     with db() as conn:
-        return pd.read_sql_query(
-            """
-            SELECT id, badge_id AS "Badge ID", status AS "Status", scanned_at AS "Scanned at"
-            FROM scans WHERE game_id = ? AND game_date = ? ORDER BY id ASC
-            """,
-            conn,
-            params=(game_id, day.isoformat()),
-        )
+        df = pd.read_sql_query(
+            'SELECT id, badge_id AS "Badge ID", game_id, game_date, status AS "Status", '
+            'scanned_at AS "Scanned at" FROM scans ORDER BY id DESC', conn)
+    df["Game"] = df["game_id"].map(lambda g: ITEMS.get(g, {}).get("name", g))
+    df["Date"] = df["game_date"].map(_fmt_iso)
+    return df
+
+
+def tracker_csv_bytes() -> bytes:
+    df = get_tracker()
+    out = df[["Badge ID", "Game", "Date", "Status", "Scanned at"]].rename(columns={"Status": "Result"})
+    out["Result"] = out["Result"].str.replace("🏆 ", "", regex=False)
+    return out.to_csv(index=False).encode("utf-8-sig")        # utf-8-sig: opens cleanly in Excel
+
+
+def export_tracker_csv() -> None:
+    """Keep one readable file per site: data/<SITE>/peak_tracker_<SITE>.csv (the database stays the master)."""
+    try:
+        site = current_site()
+        path = site_db_path(site).parent / f"peak_tracker_{site}.csv"
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(tracker_csv_bytes())
+        tmp.replace(path)
+    except Exception:                      # the file is a convenience copy; never block a scan
+        logger.exception("Tracker CSV export failed")
 
 
 def update_status(scan_id: int, status: str) -> None:
@@ -349,6 +368,7 @@ def update_status(scan_id: int, status: str) -> None:
         raise ValueError(f"Invalid status: {status!r}")
     with db() as conn:
         conn.execute("UPDATE scans SET status = ? WHERE id = ?", (status, scan_id))
+    export_tracker_csv()
 
 
 # ---- Email log ---------------------------------------------------------------
@@ -544,7 +564,7 @@ def process_scan(raw: str, mode: str) -> None:
         return
 
     if existing:
-        where = "; ".join(f"{GAMES.get(r['game_id'], r['game_id'])} "
+        where = "; ".join(f"{ITEMS.get(r['game_id'], {}).get('name', r['game_id'])} "
                           f"({_fmt_iso(r['game_date'])}, {r['status'].replace('🏆 ', '')})"
                           for r in existing[:3])
         if len(existing) > 3:
@@ -902,31 +922,35 @@ def render_tracker() -> None:
         kind, message = feedback
         {"success": st.success, "error": st.error, "warning": st.warning}[kind](message)
 
-    # --- numbers + table ---
-    df = get_scans(occ)
-    winners = df[df["Status"] == WINNER] if not df.empty else df
+    # --- one list for the whole site ---
+    all_rows = get_tracker()
+    g_id, g_day = split_occ(occ)
+    here = all_rows[(all_rows["game_id"] == g_id) & (all_rows["game_date"] == g_day.isoformat())]
     m1, m2 = st.columns(2)
-    m1.metric("Participants", len(df))
-    m2.metric("Winners", len(winners))
+    m1.metric("Participants", len(here))
+    m2.metric("Winners", int((here["Status"] == WINNER).sum()))
+    st.caption(f"{occ_label(occ)} is selected. New scans are saved under this game and date. "
+               f"All {site} entries: {len(all_rows)}.")
 
-    if df.empty:
-        st.info(f"No badges scanned for {occ_label(occ)} yet. Scan the first one above.")
+    if all_rows.empty:
+        st.info(f"No badges scanned for {site} yet. Scan the first one above.")
         _focus_badge_input()
         return
 
-    if not winners.empty:
-        st.caption("🏆 Winners: " + ", ".join(winners["Badge ID"]))
+    only_selected = st.checkbox("Show only the selected game and date", key="only_selected")
+    df = here if only_selected else all_rows
 
     st.session_state.editor_ids = df["id"].tolist()
-    st.session_state.editor_key = f"editor_{site}_{occ}_{st.session_state.editor_version}_{len(df)}"
+    st.session_state.editor_key = (f"editor_{site}_{st.session_state.editor_version}_"
+                                   f"{len(df)}_{int(only_selected)}_{occ if only_selected else ''}")
 
     st.data_editor(
-        df,
+        df[["id", "Badge ID", "Game", "Date", "Status", "Scanned at"]],
         key=st.session_state.editor_key,
         on_change=handle_status_edit,
         hide_index=True,
         use_container_width=True,
-        disabled=["Badge ID", "Scanned at"],
+        disabled=["Badge ID", "Game", "Date", "Scanned at"],
         column_config={
             "id": None,
             "Status": st.column_config.SelectboxColumn(
@@ -934,6 +958,9 @@ def render_tracker() -> None:
                 options=STATUS_OPTIONS, required=True),
         },
     )
+    st.download_button(f"⬇ Download {site} tracker file (CSV)", tracker_csv_bytes(),
+                       file_name=f"peak_tracker_{site}.csv", mime="text/csv",
+                       key="tracker_download")
     _focus_badge_input()
 
 
