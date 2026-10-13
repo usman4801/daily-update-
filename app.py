@@ -4,7 +4,7 @@ Peak Dashboard
 Everything is in this one file (poster artwork is embedded at the bottom).
 Top   : small capsules -> [Peak Tracker] [Auto Email] [Site] [Peak Gallery]
 Below : the calendar, always visible. It is poster-style; every game card is clickable on its own
-        and opens a modal to assign the Sender, VPOC and HR.
+        and opens a modal to assign the Sender and the VPOC (the VPOC is also the HR contact).
 
 Sites : DXB5, DXB3 and AUH1 are kept completely separate. Each site has its own SQLite file
         (data/<SITE>/peak_dashboard.db) with its own tables: scans, VPOC assignments, email log, gallery.
@@ -407,7 +407,7 @@ def delete_image(image_id: int) -> None:
 # =============================================================================
 # 3. EMAIL (smtplib)
 # =============================================================================
-def build_reminder_email(game_name: str, vpoc_name: str, hr_name: str, run_date: date):
+def build_reminder_email(game_name: str, vpoc_name: str, run_date: date):
     """Returns (subject, plain_text, html)."""
     day = run_date.strftime("%A, %d %B %Y")
     subject = f"Peak 2026: it's your day to run \"{game_name}\" ({run_date.strftime('%d %b')})"
@@ -415,16 +415,14 @@ def build_reminder_email(game_name: str, vpoc_name: str, hr_name: str, run_date:
         f"Hi {vpoc_name},\n\n"
         f"This is your reminder that {day} is your day to run the engagement activity "
         f"\"{game_name}\" for Peak 2026.\n\n"
-        f"Your HR partner for this activity is {hr_name}. Please coordinate with them ahead of time "
-        f"and use the Peak Dashboard to scan badges and record winners.\n\n"
+        f"Please use the Peak Dashboard to scan badges and record winners.\n\n"
         f"Thanks,\nPeak 2026 Team"
     )
     body = (
         f"<p>Hi {html.escape(vpoc_name)},</p>"
         f"<p>This is your reminder that <b>{html.escape(day)}</b> is your day to run the engagement "
         f"activity <b>{html.escape(game_name)}</b> for Peak 2026.</p>"
-        f"<p>Your HR partner for this activity is <b>{html.escape(hr_name)}</b>. Please coordinate "
-        f"with them ahead of time and use the Peak Dashboard to scan badges and record winners.</p>"
+        f"<p>Please use the Peak Dashboard to scan badges and record winners.</p>"
         f"<p>Thanks,<br>Peak 2026 Team</p>"
     )
     return subject, text, body
@@ -468,13 +466,13 @@ def sender_for(assignment: dict) -> str:
 
 
 def notify_vpoc(game_id: str, run_date: date):
-    """Email the assigned VPOC (HR in cc), from the assigned Sender Email. Logs the attempt."""
+    """Email the assigned VPOC from the assigned Sender Email. Logs the attempt."""
     assignment = get_all_vpocs().get(game_id)
     if not assignment:
         return False, "No VPOC assigned for this game."
     subject, text, body = build_reminder_email(
-        GAMES[game_id], assignment["vpoc_name"], assignment["hr_name"], run_date)
-    to, cc = [assignment["vpoc_email"]], [assignment["hr_email"]]
+        GAMES[game_id], assignment["vpoc_name"], run_date)
+    to, cc = [assignment["vpoc_email"]], []
     ok, detail = send_email(sender_for(assignment), to, cc, subject, text, body)
     log_email(game_id, run_date, to + cc, ok, detail)
     return ok, detail
@@ -672,14 +670,28 @@ CSS = """
 
 /* ---- Capsules on top (buttons) ---- */
 .st-key-pk_tabs { margin-bottom: -.4rem; }
-.pk-hbanner { display: block; height: 58px; width: auto; max-width: 100%; border-radius: 10px; }
-.st-key-pk_tabs button {
-    border-radius: 999px !important; min-height: 0 !important; padding: .3rem 1.1rem !important;
+.pk-hbanner { display: block; height: 58px; width: auto; max-width: 100%; border-radius: 10px; margin: 0 auto; }
+.st-key-pk_tabs [data-testid="stButton"] { width: 100%; }
+.st-key-pk_tabs [data-testid="stButton"] button {
+    width: 100%; height: 40px !important; min-height: 40px !important;
+    border-radius: 999px !important; padding: 0 1.1rem !important;
     background: var(--pk-green) !important; border: 1px solid var(--pk-green) !important;
     box-shadow: 0 2px 8px rgba(47, 168, 79, .30); white-space: nowrap;
 }
-.st-key-pk_tabs button p { color: #fff !important; font-weight: 700; font-size: .82rem; margin: 0; }
-.st-key-pk_tabs button:hover { filter: brightness(.93); }
+.st-key-pk_tabs [data-testid="stButton"] button p { color: #fff !important; font-weight: 700; font-size: .82rem; margin: 0; }
+.st-key-pk_tabs [data-testid="stButton"] button:hover { filter: brightness(.93); }
+/* Site dropdown: same size and colour as the capsules */
+.st-key-site, .st-key-site [data-testid="stSelectbox"] { width: 100%; }
+.st-key-site [data-baseweb="select"] > div {
+    height: 40px; min-height: 40px; border-radius: 999px !important; padding: 0 .5rem 0 1.1rem;
+    background: var(--pk-green) !important; border: 1px solid var(--pk-green) !important;
+    box-shadow: 0 2px 8px rgba(47, 168, 79, .30); cursor: pointer;
+}
+.st-key-site [data-baseweb="select"] div, .st-key-site [data-baseweb="select"] span {
+    color: #fff !important; font-weight: 700; font-size: .82rem;
+}
+.st-key-site [data-baseweb="select"] svg { fill: #fff !important; color: #fff !important; }
+.st-key-site [data-baseweb="select"] input { caret-color: transparent; }
 
 /* ---- Tablet / pill tabs (st.radio) ---- */
 .st-key-pk_tabs [role="radiogroup"] { display: flex; flex-direction: row; gap: 6px; flex-wrap: wrap; }
@@ -723,13 +735,13 @@ def build_banner_css() -> str:
 # =============================================================================
 # 6. UI COMPONENTS
 # =============================================================================
-@st.dialog("Assign VPOC and HR")
+@st.dialog("Assign VPOC")
 def vpoc_dialog(game_id: str, when: date) -> None:
     existing = get_all_vpocs().get(game_id, {})
     st.markdown(f"**{GAMES[game_id]}**  \n{when.strftime('%A, %d %b %Y')}")
     runs = ", ".join(d.strftime("%d %b") for d in GAME_DATES.get(game_id, []))
     st.caption(f"Site: {current_site()}. This game runs on: {runs}. "
-               f"One VPOC and HR cover all of its dates.")
+               f"One VPOC covers all of its dates.")
 
     with st.form(f"vpoc_form_{current_site()}_{game_id}"):
         sender_email = st.text_input(
@@ -740,23 +752,20 @@ def vpoc_dialog(game_id: str, when: date) -> None:
         vpoc_email = c2.text_input(
             "VPOC Email", value=existing.get("vpoc_email", ""),
             help="The recipient who receives the notification.")
-        hr_name = c1.text_input("HR Name", value=existing.get("hr_name", ""))
-        hr_email = c2.text_input("HR Email (cc)", value=existing.get("hr_email", ""))
         submitted = st.form_submit_button("Save assignment", type="primary", use_container_width=True)
 
     if not submitted:
         return
 
-    values = [v.strip() for v in (sender_email, vpoc_name, vpoc_email, hr_name, hr_email)]
+    values = [v.strip() for v in (sender_email, vpoc_name, vpoc_email)]
     if not all(values):
-        st.error("Fill in all five fields.")
+        st.error("Fill in all three fields.")
         return
-    if not (EMAIL_PATTERN.match(values[0]) and EMAIL_PATTERN.match(values[2])
-            and EMAIL_PATTERN.match(values[4])):
-        st.error("Enter valid email addresses for the Sender, the VPOC and the HR.")
+    if not (EMAIL_PATTERN.match(values[0]) and EMAIL_PATTERN.match(values[2])):
+        st.error("Enter valid email addresses for the Sender and the VPOC.")
         return
 
-    upsert_vpoc(game_id, *values)
+    upsert_vpoc(game_id, values[0], values[1], values[2], values[1], values[2])
     st.session_state.pending_toast = ("Assignment saved. Use the Auto Email tab to notify.", "✅")
     st.rerun()
 
@@ -951,7 +960,6 @@ def render_email() -> None:
             "Status": status,
             "Sender": sender_for(a),
             "VPOC": f'{a["vpoc_name"]} ({a["vpoc_email"]})',
-            "HR": f'{a["hr_name"]} ({a["hr_email"]})',
             "Last email": (f'{last["sent_at"]} ' + ("✅" if last["ok"] else "❌")) if last else "—",
         })
     st.markdown("##### Assignments")
@@ -966,10 +974,10 @@ def render_email() -> None:
                             format_func=lambda d: d.strftime("%A, %d %b %Y"), key="email_date")
 
     a = vpocs[game_id]
-    subject, text, _ = build_reminder_email(GAMES[game_id], a["vpoc_name"], a["hr_name"], run_date)
+    subject, text, _ = build_reminder_email(GAMES[game_id], a["vpoc_name"], run_date)
     with st.expander("Preview email"):
         st.markdown(f"**From:** {sender_for(a)}  \n**To:** {a['vpoc_email']}  \n"
-                    f"**Cc:** {a['hr_email']}  \n**Subject:** {subject}")
+                    f"**Subject:** {subject}")
         st.text(text)
 
     if st.button("📧 Send reminder to VPOC", type="primary", use_container_width=True):
@@ -1044,19 +1052,19 @@ def gallery_dialog() -> None:
 def render_right_panel() -> None:
     """Small capsules on top (Peak Tracker / Auto Email open as pop-ups); the calendar is always shown below."""
     with st.container(key="pk_tabs"):
-        c1, c2, c_site, c3, c4, _ = st.columns(
-            [1.3, 1.3, 1.6, 2.9, 1.4, 3.4], gap="small", vertical_alignment="center")
-        if c1.button("Peak Tracker", key="pk_pill_tracker"):
-            tracker_dialog()
-        if c2.button("Auto Email", key="pk_pill_email"):
-            email_dialog()
+        c_site, c_track, c_banner, c_gallery, c_email = st.columns(
+            [1, 1, 2.4, 1, 1], gap="small", vertical_alignment="center")
         c_site.selectbox("Site", options=SITES, key="site", on_change=on_site_change,
                          format_func=lambda s: f"Site: {s}", label_visibility="collapsed")
+        if c_track.button("Peak Tracker", key="pk_pill_tracker", use_container_width=True):
+            tracker_dialog()
         if HBANNER_B64:
-            c3.markdown(f'<img class="pk-hbanner" alt="Peak 2026 - Oct-Dec \'26" '
-                        f'src="data:image/webp;base64,{HBANNER_B64}">', unsafe_allow_html=True)
-        if c4.button("Peak Gallery", key="pk_pill_gallery"):
+            c_banner.markdown(f'<img class="pk-hbanner" alt="Peak 2026 - Oct-Dec \'26" '
+                              f'src="data:image/webp;base64,{HBANNER_B64}">', unsafe_allow_html=True)
+        if c_gallery.button("Peak Gallery", key="pk_pill_gallery", use_container_width=True):
             gallery_dialog()
+        if c_email.button("Auto Email", key="pk_pill_email", use_container_width=True):
+            email_dialog()
     render_calendar()
 
 
