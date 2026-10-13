@@ -625,6 +625,10 @@ CSS = """
 [class*="st-key-pk_cell_"], [class*="st-key-pk_cell_"] > [data-testid="stVerticalBlock"] {
     position: relative; gap: 0 !important; min-width: 0;
 }
+/* small, even space between one day block and the one below it */
+[class*="st-key-pk_cell_"] { padding-bottom: 7px; box-sizing: border-box; }
+.st-key-pk_cal [data-testid="stMarkdownContainer"],
+.st-key-pk_cal [data-testid="stMarkdown"] { margin-bottom: 0 !important; }
 
 .pk-weekday {
     text-align: center; font-weight: 800; font-size: .88rem; letter-spacing: .03em;
@@ -660,7 +664,7 @@ CSS = """
 .pk-flag.ok { background: #2fb45a; color: #fff; }
 
 /* Clickable games: invisible button stretched over its own card only */
-[class*="st-key-pk_game_"] { position: absolute !important; inset: 0; z-index: 3; width: auto !important; }
+[class*="st-key-pk_game_"] { position: absolute !important; inset: 0 0 7px 0; z-index: 3; width: auto !important; }
 [class*="st-key-pk_game_"] [data-testid="stButton"],
 [class*="st-key-pk_game_"] button { width: 100%; height: 100%; }
 [class*="st-key-pk_game_"] button { opacity: 0; cursor: pointer; padding: 0; min-height: 0; }
