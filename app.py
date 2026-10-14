@@ -617,8 +617,7 @@ def _fmt_iso(iso: str) -> str:
 # =============================================================================
 _COLS = " ".join(f"{w}fr" for w in COL_W)
 
-CSS = """
-<style>
+CSS = """<style>
 :root { --pk-gap: clamp(5px, .45vw, 10px); --pk-green: #2fa84f; }
 
 /* Full-width canvas */
@@ -667,4 +666,489 @@ CSS = """
 .pk-card .pk-fallback {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 3px; height: 100%; box-sizing: border-box; padding: 26px 8px 8px;
-    text-align: center
+    text-align: center; font-weight: 800; font-size: .74rem; line-height: 1.2; color: #1b2a41;
+}
+.pk-fallback .pk-date { font-size: .7rem; opacity: .7; letter-spacing: .04em; }
+.pk-fallback .pk-name {
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pk-card.is-today  { box-shadow: 0 0 0 3px #ffb400; }
+.pk-card.is-active { outline: 3px solid #2fb45a; outline-offset: -3px; }
+.pk-flag {
+    position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .62rem; font-weight: 800; background: #ffb400; color: #3b2a00;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+.pk-flag.ok { background: #2fb45a; color: #fff; }
+
+/* Clickable games: invisible button stretched over its own card only */
+[class*="st-key-pk_game_"] { position: absolute !important; inset: 0 0 7px 0; z-index: 3; width: auto !important; }
+[class*="st-key-pk_game_"] [data-testid="stButton"],
+[class*="st-key-pk_game_"] button { width: 100%; height: 100%; }
+[class*="st-key-pk_game_"] button { opacity: 0; cursor: pointer; padding: 0; min-height: 0; }
+[class*="st-key-pk_cell_game_"]:hover .pk-card {
+    transform: translateY(-3px); box-shadow: 0 8px 18px rgba(20, 60, 90, .22);
+}
+
+/* ---- Month banner (spans the whole row) + month chip on each card ---- */
+.st-key-pk_cal [data-testid="stElementContainer"]:has(.pk-month),
+.st-key-pk_cal .element-container:has(.pk-month) { grid-column: 1 / -1; }
+.pk-month {
+    margin: 6px 0 0; padding: 5px 14px; border-radius: 999px;
+    background: var(--pk-green); color: #fff; font-weight: 800; font-size: .85rem;
+    letter-spacing: .08em; text-transform: uppercase; width: fit-content;
+    box-shadow: 0 2px 8px rgba(47, 168, 79, .30);
+}
+.pk-mchip {
+    position: absolute; top: 6px; left: 6px; z-index: 2; padding: 1px 6px; border-radius: 6px;
+    font-size: .58rem; font-weight: 800; letter-spacing: .05em;
+    background: rgba(27, 42, 65, .78); color: #fff; pointer-events: none;
+}
+
+/* ---- Capsules on top (buttons) ---- */
+.st-key-pk_tabs { margin-bottom: -.4rem; }
+.pk-hbanner { display: block; height: 58px; width: auto; max-width: 100%; border-radius: 10px; margin: 0 auto; }
+.st-key-pk_tabs [data-testid="stButton"] { width: 100%; }
+.st-key-pk_tabs [data-testid="stButton"] button {
+    width: 100%; height: 40px !important; min-height: 40px !important;
+    border-radius: 999px !important; padding: 0 1.1rem !important;
+    background: var(--pk-green) !important; border: 1px solid var(--pk-green) !important;
+    box-shadow: 0 2px 8px rgba(47, 168, 79, .30); white-space: nowrap;
+}
+.st-key-pk_tabs [data-testid="stButton"] button p { color: #fff !important; font-weight: 700; font-size: .82rem; margin: 0; }
+.st-key-pk_tabs [data-testid="stButton"] button:hover { filter: brightness(.93); }
+/* Site dropdown: same size and colour as the capsules */
+.st-key-site, .st-key-site [data-testid="stSelectbox"] { width: 100%; }
+.st-key-site [data-baseweb="select"] > div {
+    height: 40px; min-height: 40px; border-radius: 999px !important; padding: 0 .5rem 0 1.1rem;
+    background: var(--pk-green) !important; border: 1px solid var(--pk-green) !important;
+    box-shadow: 0 2px 8px rgba(47, 168, 79, .30); cursor: pointer;
+}
+.st-key-site [data-baseweb="select"] div, .st-key-site [data-baseweb="select"] span {
+    color: #fff !important; font-weight: 700; font-size: .82rem;
+}
+.st-key-site [data-baseweb="select"] svg { fill: #fff !important; color: #fff !important; }
+.st-key-site [data-baseweb="select"] input { caret-color: transparent; }
+
+/* ---- Tablet / pill tabs (st.radio) ---- */
+.st-key-pk_tabs [role="radiogroup"] { display: flex; flex-direction: row; gap: 6px; flex-wrap: wrap; }
+.st-key-pk_tabs label[data-baseweb="radio"] {
+    margin: 0; padding: .25rem .85rem; border-radius: 999px; cursor: pointer;
+    background: rgba(128, 138, 155, .14); border: 1px solid rgba(128, 138, 155, .35);
+    transition: all .15s ease;
+}
+.st-key-pk_tabs label[data-baseweb="radio"]:hover { background: rgba(47, 168, 79, .15); }
+.st-key-pk_tabs label[data-baseweb="radio"] > div:first-child { display: none; }  /* hide radio dot */
+.st-key-pk_tabs label[data-baseweb="radio"] p { font-weight: 700; font-size: .8rem; margin: 0; }
+.st-key-pk_tabs label[data-baseweb="radio"]:has(input:checked) {
+    background: var(--pk-green); border-color: var(--pk-green);
+    box-shadow: 0 3px 10px rgba(47, 168, 79, .35);
+}
+.st-key-pk_tabs label[data-baseweb="radio"]:has(input:checked) p { color: #fff; }
+
+/* ---- Metric tiles (sized for the narrow left panel) ---- */
+[data-testid="stMetric"] {
+    background: rgba(128, 138, 155, .10); border: 1px solid rgba(128, 138, 155, .30);
+    border-radius: 14px; padding: .7rem .9rem;
+}
+[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+[data-testid="stMetricLabel"] p { font-size: .9rem; font-weight: 600; opacity: .8; }
+
+@media (max-width: 900px) {
+    .st-key-pk_cal { padding-left: 1.2%; }
+    .st-key-pk_cal::before { display: none; }
+}
+</style>""".replace("__COLS__", _COLS)
+
+
+def build_banner_css() -> str:
+    if not BANNER_B64:
+        return ""
+    return ('<style>.st-key-pk_cal::before { background-image: '
+            f'url("data:image/webp;base64,{BANNER_B64}"); }}</style>')
+
+
+# =============================================================================
+# 6. UI COMPONENTS
+# =============================================================================
+@st.dialog("Assign VPOC")
+def vpoc_dialog(game_id: str, when: date) -> None:
+    existing = get_all_vpocs().get(game_id, {})
+    st.markdown(f"**{GAMES[game_id]}**  \n{when.strftime('%A, %d %b %Y')}")
+    runs = ", ".join(d.strftime("%d %b") for d in GAME_DATES.get(game_id, []))
+    st.caption(f"Site: {current_site()}. This game runs on: {runs}. "
+               f"One VPOC covers all of its dates.")
+
+    with st.form(f"vpoc_form_{current_site()}_{game_id}"):
+        sender_email = st.text_input(
+            "Sender Email", value=existing.get("sender_email") or DEFAULT_SENDER_EMAIL,
+            help="The address the notification is sent from.")
+        c1, c2 = st.columns(2)
+        vpoc_name = c1.text_input("VPOC Name", value=existing.get("vpoc_name", ""))
+        vpoc_email = c2.text_input(
+            "VPOC Email", value=existing.get("vpoc_email", ""),
+            help="The recipient who receives the notification.")
+        submitted = st.form_submit_button("Save assignment", type="primary", use_container_width=True)
+
+    if not submitted:
+        return
+
+    values = [v.strip() for v in (sender_email, vpoc_name, vpoc_email)]
+    if not all(values):
+        st.error("Fill in all three fields.")
+        return
+    if not (EMAIL_PATTERN.match(values[0]) and EMAIL_PATTERN.match(values[2])):
+        st.error("Enter valid email addresses for the Sender and the VPOC.")
+        return
+
+    upsert_vpoc(game_id, values[0], values[1], values[2], values[1], values[2])
+    st.session_state.pending_toast = ("Assignment saved. Use the Auto Email tab to notify.", "✅")
+    st.rerun()
+
+
+def week_month_label(week: list) -> str:
+    """'OCTOBER – NOVEMBER 2026' style label for the days present in one calendar week."""
+    days = [c[0] for c in week if c]
+    names = []
+    for d in days:
+        n = d.strftime("%B")
+        if n not in names:
+            names.append(n)
+    return f"{' – '.join(names)} {days[-1].year}"
+
+
+def build_weeks() -> list:
+    cells = [(START_DATE + timedelta(days=i), key) for i, key in enumerate(SCHEDULE)]
+    cells += [None] * (-len(cells) % 7)
+    return [cells[i:i + 7] for i in range(0, len(cells), 7)]
+
+
+def card_html(day: date, item: dict, *, ratio: float, vpoc_set: bool,
+              is_today: bool, is_active: bool) -> str:
+    classes = ["pk-card", item["kind"]]
+    if is_today:
+        classes.append("is-today")
+    if is_active:
+        classes.append("is-active")
+
+    flag = ""
+    if item["kind"] == "game":
+        flag = ('<span class="pk-flag ok" title="VPOC assigned">✓</span>' if vpoc_set
+                else '<span class="pk-flag" title="No VPOC assigned yet">!</span>')
+
+    b64 = CARD_B64.get(day.isoformat())
+    if b64:
+        inner = f'<img src="data:image/webp;base64,{b64}" alt="{html.escape(item["name"])}">'
+        style = f' style="aspect-ratio:{ratio:.4f}"'
+    else:
+        classes.append("is-text")
+        inner = (f'<div class="pk-fallback"><span class="pk-date">{day.day} {day.strftime("%b").upper()}</span>'
+                 f'<span class="pk-name">{item["emoji"]} {html.escape(item["name"])}</span></div>')
+        style = ""
+
+    chip = f'<span class="pk-mchip">{day.strftime("%b").upper()}</span>'
+    return f'<div class="{" ".join(classes)}"{style}>{inner}{chip}{flag}</div>'
+
+
+def render_calendar() -> None:
+    vpocs = get_all_vpocs()
+    today = date.today()
+    active_date = st.session_state.active_date
+
+    with st.container(key="pk_cal"):
+        for name in WEEKDAYS:
+            css_class = "pk-weekday sat" if name == "Saturday" else "pk-weekday"
+            st.markdown(f'<div class="{css_class}">{name}</div>', unsafe_allow_html=True)
+
+        last_label = None
+        for week_no, week in enumerate(build_weeks()):
+            label = week_month_label(week)
+            if label != last_label:
+                st.markdown(f'<div class="pk-month">{label}</div>', unsafe_allow_html=True)
+                last_label = label
+
+            for col_no, cell in enumerate(week):
+                if cell is None:
+                    continue
+                day, key = cell
+                item = ITEMS[key]
+                is_game = item["kind"] == "game"
+                # only the block that was clicked is highlighted (not every day of the same game)
+                is_active = is_game and (day.isoformat() == active_date if active_date else False)
+                ratio = COL_W[col_no] / ROW_H[min(week_no, len(ROW_H) - 1)]
+                cell_key = f"pk_cell_game_{day.isoformat()}" if is_game else f"pk_cell_{day.isoformat()}"
+                with st.container(key=cell_key):
+                    st.markdown(
+                        card_html(day, item, ratio=ratio, vpoc_set=key in vpocs,
+                                  is_today=(day == today), is_active=is_active),
+                        unsafe_allow_html=True,
+                    )
+                    if is_game:
+                        clicked = st.button(
+                            f'Open {item["name"]} on {day.strftime("%d %b")}',
+                            key=f'pk_game_{day.isoformat()}',
+                            on_click=select_game, args=(key, day.isoformat()),
+                        )
+                        if clicked:
+                            vpoc_dialog(key, day)
+
+
+
+
+# ---- Tab: Peak Tracker -------------------------------------------------------
+def _focus_badge_input() -> None:
+    """Put the cursor back into the badge box after every scan (the scanner types into it)."""
+    try:
+        components.html(
+            """<script>
+            setTimeout(function () {
+              try {
+                var el = window.parent.document.querySelector('input[aria-label="Scan employee badge"]');
+                if (el) { el.focus(); }
+              } catch (e) {}
+            }, 120);
+            </script>""",
+            height=0,
+        )
+    except Exception:          # cosmetic only: never let autofocus break the tracker
+        pass
+
+
+def render_tracker() -> None:
+    site = current_site()
+    st.caption(f"Site: {site}")
+
+    # The selectbox only exists while this dialog is open, so re-seed its value from the shared
+    # active_occ (also updated by calendar clicks) on every run.
+    if st.session_state.active_occ not in OCC_IDS:
+        st.session_state.active_occ = default_occ()
+    st.session_state.tracker_game_select = st.session_state.active_occ
+    occ = st.selectbox(
+        "Game being tracked", options=OCC_IDS, format_func=occ_label,
+        key="tracker_game_select", on_change=sync_tracker_game,
+    )
+
+    mode = st.radio("Add scanned employee as", ["Participant", "Winner"], horizontal=True,
+                    key="scan_mode", help="Choose Winner to save the next scanned logins as winners.")
+
+    # A form: nothing runs while the scanner types; one clean run happens on Enter.
+    with st.form("scan_form", clear_on_submit=True, border=False):
+        raw = st.text_input("Scan employee badge", key="badge_input",
+                            placeholder="Click here, then scan the badge")
+        submitted = st.form_submit_button("Add", type="primary")
+    if submitted:
+        process_scan(raw, mode)
+
+    # --- messages ---
+    dup = st.session_state.scan_dup
+    if dup and dup["site"] == site:
+        w1, w2 = st.columns([3, 1], vertical_alignment="center")
+        w1.warning(f"**Duplicate entry**: {dup['badge']} is already in the {site} database "
+                   f"({dup['where']}).")
+        w2.button("Still want to add", key="force_add_btn", on_click=force_add,
+                  use_container_width=True)
+    feedback = st.session_state.scan_feedback
+    if feedback:
+        kind, message = feedback
+        {"success": st.success, "error": st.error, "warning": st.warning}[kind](message)
+
+    # --- one list for the whole site ---
+    all_rows = get_tracker()
+    g_id, g_day = split_occ(occ)
+    here = all_rows[(all_rows["game_id"] == g_id) & (all_rows["game_date"] == g_day.isoformat())]
+    m1, m2 = st.columns(2)
+    m1.metric("Participants", len(here))
+    m2.metric("Winners", int((here["Status"] == WINNER).sum()))
+    st.caption(f"{occ_label(occ)} is selected. New scans are saved under this game and date. "
+               f"All {site} entries: {len(all_rows)}.")
+
+    if all_rows.empty:
+        st.info(f"No badges scanned for {site} yet. Scan the first one above.")
+        _focus_badge_input()
+        return
+
+    only_selected = st.checkbox("Show only the selected game and date", key="only_selected")
+    df = here if only_selected else all_rows
+
+    st.session_state.editor_ids = df["id"].tolist()
+    st.session_state.editor_key = (f"editor_{site}_{st.session_state.editor_version}_"
+                                   f"{len(df)}_{int(only_selected)}_{occ if only_selected else ''}")
+
+    st.data_editor(
+        df[["id", "Badge ID", "Game", "Date", "Status", "Scanned at"]],
+        key=st.session_state.editor_key,
+        on_change=handle_status_edit,
+        hide_index=True,
+        use_container_width=True,
+        disabled=["Badge ID", "Game", "Date", "Scanned at"],
+        column_config={
+            "id": None,
+            "Status": st.column_config.SelectboxColumn(
+                "Result", help="Choose Winner to mark this employee as a winner",
+                options=STATUS_OPTIONS, required=True),
+        },
+    )
+    st.download_button(f"⬇ Download {site} tracker file (CSV)", tracker_csv_bytes(),
+                       file_name=f"peak_tracker_{site}.csv", mime="text/csv",
+                       key="tracker_download")
+    _focus_badge_input()
+
+
+# ---- Tab: Auto Email ---------------------------------------------------------
+def _fmt_dates(dates: list) -> str:
+    return ", ".join(d.strftime("%d %b") for d in dates)
+
+
+def render_email() -> None:
+    vpocs = get_all_vpocs()
+    today = date.today()
+
+    if not vpocs:
+        st.info(f"No VPOCs assigned yet for {current_site()}. Click a game in the calendar to assign one.")
+        return
+
+    # --- Overview table ---
+    rows = []
+    for gid, a in vpocs.items():
+        dates = GAME_DATES[gid]
+        upcoming = [d for d in dates if d >= today]
+        status = "Today" if today in dates else ("Upcoming" if upcoming else "Completed")
+        last = get_last_email(gid)
+        rows.append({
+            "Game": GAMES[gid],
+            "Dates": _fmt_dates(dates),
+            "Next run": (upcoming[0] if upcoming else dates[-1]).strftime("%d %b %Y"),
+            "Status": status,
+            "Sender": sender_for(a),
+            "VPOC": f'{a["vpoc_name"]} ({a["vpoc_email"]})',
+            "Last email": (f'{last["sent_at"]} ' + ("✅" if last["ok"] else "❌")) if last else "—",
+        })
+    st.markdown("##### Assignments")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+    # --- Send for one game/date ---
+    st.markdown("##### Send a reminder")
+    game_id = st.selectbox("Game", options=list(vpocs), format_func=GAMES.get, key="email_game")
+    dates = GAME_DATES[game_id]
+    default_idx = next((i for i, d in enumerate(dates) if d >= today), len(dates) - 1)
+    run_date = st.selectbox("Day the VPOC runs it", options=dates, index=default_idx,
+                            format_func=lambda d: d.strftime("%A, %d %b %Y"), key="email_date")
+
+    a = vpocs[game_id]
+    subject, text, _ = build_reminder_email(GAMES[game_id], a["vpoc_name"], run_date)
+    with st.expander("Preview email"):
+        st.markdown(f"**From:** {sender_for(a)}  \n**To:** {a['vpoc_email']}  \n"
+                    f"**Subject:** {subject}")
+        st.text(text)
+
+    if st.button("📧 Send reminder to VPOC", type="primary", use_container_width=True):
+        with st.spinner("Sending..."):
+            ok, detail = notify_vpoc(game_id, run_date)
+        (st.success if ok else st.error)(
+            f"Email sent to {a['vpoc_email']}." if ok else f"Email failed. {detail}")
+
+    # --- Bulk: everything scheduled today ---
+    st.markdown("##### Today")
+    due = [g for g in vpocs if today in GAME_DATES[g] and not was_sent(g, today)]
+    if not due:
+        st.caption("No pending reminders for today.")
+    elif st.button(f"Send today's reminders ({len(due)})", use_container_width=True):
+        for gid in due:
+            ok, detail = notify_vpoc(gid, today)
+            (st.success if ok else st.error)(
+                f"{GAMES[gid]}: sent." if ok else f"{GAMES[gid]}: {detail}")
+
+@st.dialog("Peak Tracker", width="large")
+def tracker_dialog() -> None:
+    render_tracker()
+
+
+@st.dialog("Auto Email", width="large")
+def email_dialog() -> None:
+    render_email()
+
+
+@st.dialog("Peak Gallery", width="large")
+def gallery_dialog() -> None:
+    st.caption(f"Site: {current_site()}. Save pictures from the Peak events here. "
+               f"Everyone using the dashboard can see them (this gallery is only for {current_site()}).")
+    files = st.file_uploader(
+        "Add images", type=GALLERY_TYPES, accept_multiple_files=True,
+        key=f"gallery_upload_{st.session_state.gallery_ver}",
+    )
+    if files and st.button("💾 Save to gallery", type="primary", key="gallery_save"):
+        saved, skipped = 0, 0
+        for f in files:
+            if f.size > GALLERY_MAX_MB * 1024 * 1024:
+                skipped += 1
+                continue
+            add_image(f.name, f.type, f.getvalue())
+            saved += 1
+        st.session_state.gallery_ver += 1                       # clears the uploader
+        msg = f"{saved} image(s) saved to the gallery."
+        if skipped:
+            msg += f" {skipped} skipped (over {GALLERY_MAX_MB} MB)."
+        st.toast(msg, icon="🖼️")
+        st.rerun(scope="fragment")
+
+    images = list_images()
+    if not images:
+        st.info("No images yet. Add the first one above.")
+        return
+    st.markdown(f"**{len(images)} image(s)**")
+    cols = st.columns(3)
+    for n, img in enumerate(images):
+        with cols[n % 3]:
+            with st.container(border=True):
+                st.image(img["data"], use_container_width=True)
+                st.caption(f'{img["filename"]} · {img["uploaded_at"][:10]}')
+                d1, d2 = st.columns(2)
+                d1.download_button("⬇ Save", img["data"], file_name=img["filename"],
+                                   mime=img["mime"], key=f'gal_dl_{img["id"]}',
+                                   use_container_width=True)
+                d2.button("🗑 Delete", key=f'gal_del_{img["id"]}', use_container_width=True,
+                          on_click=delete_image, args=(img["id"],))
+
+
+def render_right_panel() -> None:
+    """Small capsules on top (Peak Tracker / Auto Email open as pop-ups); the calendar is always shown below."""
+    with st.container(key="pk_tabs"):
+        c_site, c_track, c_banner, c_gallery, c_email = st.columns(
+            [1, 1, 2.4, 1, 1], gap="small", vertical_alignment="center")
+        c_site.selectbox("Site", options=SITES, key="site", on_change=on_site_change,
+                         format_func=lambda s: f"Site: {s}", label_visibility="collapsed")
+        if c_track.button("Peak Tracker", key="pk_pill_tracker", use_container_width=True):
+            tracker_dialog()
+        if HBANNER_B64:
+            c_banner.markdown(f'<img class="pk-hbanner" alt="Peak 2026 - Oct-Dec \'26" '
+                              f'src="data:image/webp;base64,{HBANNER_B64}">', unsafe_allow_html=True)
+        if c_gallery.button("Peak Gallery", key="pk_pill_gallery", use_container_width=True):
+            gallery_dialog()
+        if c_email.button("Auto Email", key="pk_pill_email", use_container_width=True):
+            email_dialog()
+    render_calendar()
+
+
+# =============================================================================
+# 7. MAIN
+# =============================================================================
+def main() -> None:
+    st.set_page_config(page_title=APP_TITLE, page_icon="⛰️", layout="wide")
+    init_state()
+    get_conn(current_site())          # opens (and creates / upgrades) the selected site's database once
+    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(build_banner_css(), unsafe_allow_html=True)
+
+    if st.session_state.pending_toast:
+        message, icon = st.session_state.pending_toast
+        st.toast(message, icon=icon)
+        st.session_state.pending_toast = None
+
+    render_right_panel()
+
+
+# =============================================================================
+# 8. POSTER ARTWORK (embedded images)
+# =============================================================================
+HBANNER_B64 = "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
