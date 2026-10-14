@@ -575,7 +575,7 @@ def process_scan(raw: str, mode: str) -> None:
 
     add_scan(badge, occ, status)
     st.session_state.scan_feedback = ("success", f"{badge} added as {status.replace('🏆 ', '')} "
-                                                 f"to {occ_label(occ)}.")
+                                                  f"to {occ_label(occ)}.")
     st.toast(f"{badge} added", icon="✅")
 
 
@@ -863,13 +863,13 @@ def render_calendar() -> None:
             css_class = "pk-weekday sat" if name == "Saturday" else "pk-weekday"
             st.markdown(f'<div class="{css_class}">{name}</div>', unsafe_allow_html=True)
 
-        prev_months = None
+        last_label = None
         for week_no, week in enumerate(build_weeks()):
-            months = tuple(dict.fromkeys(c[0].strftime("%B") for c in week if c))
-            if months != prev_months:                       # first week, or the month(s) changed
-                st.markdown(f'<div class="pk-month">{week_month_label(week)}</div>',
-                            unsafe_allow_html=True)
-                prev_months = months
+            label = week_month_label(week)
+            if label != last_label:
+                st.markdown(f'<div class="pk-month">{label}</div>', unsafe_allow_html=True)
+                last_label = label
+
             for col_no, cell in enumerate(week):
                 if cell is None:
                     continue
@@ -878,3 +878,12 @@ def render_calendar() -> None:
                 is_game = item["kind"] == "game"
                 # only the block that was clicked is highlighted (not every day of the same game)
                 is_active = is_game and (day.isoformat() == active_date if active_date else False)
+                ratio = COL_W[col_no] / ROW_H[min(week_no, len(ROW_H) - 1)]
+                cell_key = f"pk_cell_game_{day.isoformat()}" if is_game else f"pk_cell_{day.isoformat()}"
+                with st.container(key=cell_key):
+                    st.markdown(
+                        card_html(day, item, ratio=ratio, vpoc_set=key in vpocs,
+                                  is_today=(day == today), is_active=is_active),
+                        unsafe_allow_html=True,
+                    )
+                    if is_game
