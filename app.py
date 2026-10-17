@@ -183,4 +183,30 @@ def render_site(site: str):
     if hide_empty:
         det = det[det["Grand Total"] > 0]
     det = blank_zero_targets(det, "Target")
-    det["Status"] = [status(a / t) if pd.notna(a) and pd.notna(t) and
+    
+    # Fixed syntax error bracket issue here:
+    det["Status"] = [
+        status(a / t) if pd.notna(a) and pd.notna(t) and t else "" 
+        for a, t in zip(det["Actual % (w/o OT)"], det["Target"])
+    ]
+    
+    keep = ["Department", "Shift", "OFF", "PL", "Present (incl. OT)", "OT", "SL", "AB/ABWI", "Grand Total",
+            "Scheduled", "Target", "Actual % (w/o OT)", "Expected HC", "Actual HC", "Delta HC", "Status"]
+    if det["0"].sum() > 0:
+        keep.insert(2, "0")
+    show_df(det[keep], pct_cols=["Target", "Actual % (w/o OT)"])
+    st.caption("Expected HC = LM target × scheduled. Delta HC = actual present (without OT) − expected HC.")
+
+
+# ----------------------------------------------------------------------------- tabs
+tab_ov, tab_dxb5, tab_dxb8, tab_dwc3, tab_trans, tab_abs, tab_roster, tab_dq = st.tabs(
+    ["Overview", "DXB5", "DXB8 (SC)", "DWC3", "🚌 Transport & Tracking", "Absence & exceptions", "Roster explorer", "Data checks"])
+
+with tab_ov:
+    tot = overview.iloc[-1]
+    k = st.columns(5)
+    k[0].metric("Total HC (all sites)", f"{int(tot[TODAY]):,}",
+                delta=f"{int(tot['Change']):+d} vs prev day", delta_color="off")
+    k[1].metric("Scheduled to work", f"{int(tot['Schedule to Work']):,}")
+    k[2].metric("Present (w/o OT)", f"{int(tot['Present']):,}")
+    k[3].metric
