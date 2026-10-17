@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-NAVY, BLUE, ORANGE = "#14284b", "#1b4b8f", "#f7941d"
+NAVY, BLUE, ORANGE, GREEN = "#0f2147", "#1b5cc8", "#f7941d", "#1fa855"
 STATUSES = ["On Route", "Delayed", "Arrived", "Not Started"]
 PILL = {
     "On Route": ("#dcf5e4", "#1a8a45"),
@@ -42,6 +42,7 @@ SEATS = 22  # every bus has 22 seats
 MANIFEST_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.csv")
 MAN_COLS = ["AMZ ID", "Employee Name", "Bus No", "Pickup Location", "Shift"]
 STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bus_status.json")
+NAV = ["🚌 Live Bus Fleet", "📍 Pickup Timings & Routes", "👥 Pickup Headcounts", "📄 Employee Manifest (AMZ ID)"]
 
 # =============================================================================
 # DATA  (edit here, or upload a pickup schedule file in the app)
@@ -226,6 +227,15 @@ def to_excel(sheets):
     return buf.getvalue()
 
 
+def contains(df, text):
+    return df.astype(str).apply(lambda c: c.str.contains(text, case=False, regex=False)).any(axis=1)
+
+
+def short_route(route):
+    first = route.replace(" & ", " / ").split(" / ")[0]
+    return first[:26]
+
+
 # =============================================================================
 # STYLE
 # =============================================================================
@@ -233,141 +243,264 @@ st.markdown(
     f"""
 <style>
 [data-testid="stSidebar"], [data-testid="collapsedControl"] {{display:none !important;}}
-.stApp {{background:#f3f5fa;}}
-.block-container {{padding-top:4.5rem; padding-bottom:2rem; max-width:1500px;}}
-.st-key-hdr {{background:linear-gradient(90deg,{NAVY},#1d3a66); border-radius:14px; padding:10px 22px; color:#fff;}}
-.hdr-title {{font-size:21px; font-weight:700; line-height:1.2;}}
-.hdr-sub {{font-size:12px; opacity:.85;}}
-.logo {{font-size:30px; font-weight:800; letter-spacing:-1px; margin-right:14px;}}
-.logo span {{color:{ORANGE};}}
-[class*="st-key-card"] {{background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(20,40,75,.08);}}
-.kpi {{display:flex; gap:14px; align-items:center; background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(20,40,75,.08); height:124px; box-sizing:border-box;}}
-.kpi .ic {{width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px;}}
-.kpi .lb {{font-weight:600; color:{NAVY};}} .kpi .v {{font-size:32px; font-weight:800; color:{NAVY}; line-height:1.1;}}
+header[data-testid="stHeader"] {{background:transparent;}}
+.stApp {{background:#f2f5fb;}}
+.block-container {{padding-top:3.4rem; padding-bottom:1.2rem; max-width:1600px;}}
+
+/* ---------- top header ---------- */
+.st-key-hdr {{background:{NAVY}; border-radius:12px; padding:8px 22px; color:#fff;}}
+.hdr-title {{font-size:20px; font-weight:700; line-height:1.2;}}
+.hdr-sub {{font-size:11.5px; opacity:.85;}}
+.logo {{font-size:30px; font-weight:800; letter-spacing:-1.5px; line-height:.9; margin-right:16px; padding-right:18px; border-right:1px solid rgba(255,255,255,.25);}}
+.logo small {{display:block; color:{ORANGE}; font-size:22px; margin-top:-8px; text-align:center;}}
+.busbox {{font-size:30px; margin-right:16px;}}
+.hbtn {{display:inline-flex; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; font-size:20px; position:relative;}}
+.hbtn.av {{background:#fff; color:{NAVY};}}
+.hbtn b {{position:absolute; top:4px; right:5px; width:9px; height:9px; border-radius:50%; background:#ff5a3c;}}
+.st-key-hdr [data-baseweb="select"] > div {{background:rgba(255,255,255,.08); border:0; color:#fff;}}
+.st-key-hdr [data-baseweb="select"] * {{color:#fff !important; fill:#fff !important;}}
+
+/* ---------- nav bar ---------- */
+.st-key-navbar {{background:#fff; border-radius:12px; padding:0 10px; box-shadow:0 1px 4px rgba(15,33,71,.08);}}
+.st-key-navbar [role="radiogroup"] {{width:100%; gap:0; flex-wrap:nowrap;}}
+.st-key-navbar [role="radiogroup"] label {{flex:1; justify-content:center; margin:0; padding:15px 8px; border-bottom:3px solid transparent; cursor:pointer;}}
+.st-key-navbar [role="radiogroup"] label > div:first-child {{display:none;}}
+.st-key-navbar [role="radiogroup"] label p {{font-weight:600; font-size:14px; color:{NAVY};}}
+.st-key-navbar [role="radiogroup"] label:has(input:checked) {{border-bottom-color:{ORANGE}; background:#fff5e9;}}
+.st-key-navbar [role="radiogroup"] label:has(input:checked) p {{color:{ORANGE};}}
+
+/* ---------- cards ---------- */
+[class*="st-key-card"] {{background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(15,33,71,.08);}}
+.card-t {{font-size:16px; font-weight:700; color:{NAVY}; line-height:1.2;}}
+.card-s {{font-size:11.5px; color:#6b7686; margin-bottom:8px;}}
+.card-h {{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;}}
+.lnk {{font-size:12px; font-weight:600; color:{BLUE}; white-space:nowrap;}}
+.dot {{display:inline-block; width:8px; height:8px; border-radius:50%; margin:0 4px 0 12px;}}
+.lg {{font-size:11px; color:#5b6778; white-space:nowrap;}}
+
+/* ---------- KPI ---------- */
+.kpi {{display:flex; gap:16px; align-items:center; background:#fff; border-radius:12px; padding:16px 20px; box-shadow:0 1px 4px rgba(15,33,71,.08); height:118px; box-sizing:border-box;}}
+.kpi.warm {{background:linear-gradient(135deg,#fff,#fff4e8);}}
+.kpi .ic {{width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; flex:none;}}
+.kpi .lb {{font-weight:600; color:{NAVY}; font-size:14px;}}
+.kpi .v {{font-size:34px; font-weight:800; color:{NAVY}; line-height:1.1;}}
 .kpi .sb {{font-size:12px; color:#6b7686;}}
-.bar {{height:7px; background:#e8ebf2; border-radius:5px; margin-top:6px;}} .bar div {{height:7px; border-radius:5px; background:{ORANGE};}}
-.card-t {{font-size:17px; font-weight:700; color:{NAVY}; margin:0 0 6px 0;}}
-.pill {{padding:2px 10px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap;}}
-.bgrid {{display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:10px; max-height:400px; overflow-y:auto; padding-right:4px;}}
-.bc {{border:1px solid #e8ebf2; border-radius:12px; padding:10px 12px; background:#fff;}}
-.bh {{display:flex; justify-content:space-between; align-items:center; color:{NAVY}; font-size:13px;}}
-.seats {{display:grid; grid-template-columns:repeat(11,1fr); gap:3px; margin:9px 0;}}
-.seats i {{aspect-ratio:1; border-radius:3px; background:#dfe6f3;}} .seats i.f {{background:{ORANGE};}}
-.bf {{display:flex; justify-content:space-between; font-size:12px; color:#5b6778;}}
-.bf .ok {{color:#1a8a45; font-weight:700;}} .bf .ov {{color:#c62828; font-weight:700;}}
-.lg {{font-size:12px; color:#5b6778; margin:2px 0 8px;}}
-[class*="st-key-qa_"] {{border-radius:12px; padding:2px 8px; margin-bottom:8px;}}
-.st-key-qa_export {{background:#eaf1fd; border-left:5px solid {BLUE};}}
-.st-key-qa_wa {{background:#e6f7ec; border-left:5px solid #25a55a;}}
-.st-key-qa_delay {{background:#fff3e0; border-left:5px solid {ORANGE};}}
-.st-key-qa_print {{background:#f1ecfb; border-left:5px solid #7c4dcc;}}
-[class*="st-key-qa_"] button {{border:0 !important; background:transparent !important; justify-content:flex-start; font-weight:700; color:{NAVY};}}
-[class*="st-key-qa_"] details {{border:0 !important;}}
-[class*="st-key-qa_"] summary {{font-weight:700; color:{NAVY};}}
-.fs {{max-height:300px; overflow-y:auto;}}
-.fs-row {{display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f2f7; font-size:13px; color:{NAVY};}}
-.tbl-wrap {{overflow-x:auto;}}
-table.t {{border-collapse:collapse; width:100%; font-size:12.5px; color:{NAVY};}}
-table.t th {{background:{NAVY}; color:#fff; padding:9px 8px; text-align:left; font-weight:600; white-space:nowrap;}}
-table.t td {{padding:8px; border-bottom:1px solid #eef0f5; vertical-align:middle;}}
-table.t tr:nth-child(even) td {{background:#fafbfd;}}
+.kpi .ok {{font-size:12px; color:{GREEN}; font-weight:600;}}
+.kpi .bad {{font-size:12px; color:#c62828; font-weight:600;}}
+.kpi .wn {{font-size:12px; color:{ORANGE}; font-weight:600;}}
+.bar {{height:7px; background:#e8ebf2; border-radius:5px; margin-top:6px;}} .bar div {{height:7px; border-radius:5px; background:{GREEN};}}
+
+/* ---------- seat usage ---------- */
+.ub {{display:grid; grid-template-columns:50px 1fr 46px 38px; gap:8px; align-items:center; font-size:11px; color:{NAVY}; padding:3px 0;}}
+.ub .tr {{height:6px; background:#e8ebf2; border-radius:4px;}} .ub .tr div {{height:6px; border-radius:4px;}}
+.ub span:nth-child(3), .ub span:nth-child(4) {{text-align:right; color:#4a5568;}}
+.ubox {{max-height:300px; overflow-y:auto;}}
+.stat {{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:{NAVY}; padding:7px 0;}}
+.stat b {{font-size:15px;}}
+.sd {{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px;}}
+
+/* ---------- fleet status ---------- */
+.fs {{max-height:430px; overflow-y:auto;}}
+.fs-row {{display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #f0f2f7; font-size:12.5px; color:{NAVY};}}
+.fs-row .bn {{font-weight:700; font-size:13.5px;}} .fs-row .rt2 {{font-size:11px; color:#6b7686;}}
+.fs-row .tm {{margin-left:auto; color:#4a5568; font-size:12px; white-space:nowrap;}}
+.pill {{padding:2px 10px; border-radius:10px; font-size:10.5px; font-weight:700; white-space:nowrap;}}
+
+/* ---------- alerts ---------- */
+.al {{display:flex; align-items:center; gap:10px; padding:8px 0; font-size:12.5px; color:{NAVY};}}
+.al .ai {{width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; flex:none;}}
+.al .tm {{margin-left:auto; color:#6b7686; font-size:11.5px; white-space:nowrap;}}
+
+/* ---------- table ---------- */
+.tbl-wrap {{overflow-x:auto; border:1px solid #eef0f5; border-radius:10px; max-height:430px; overflow-y:auto;}}
+table.t {{border-collapse:collapse; width:100%; font-size:12px; color:{NAVY};}}
+table.t th {{background:#f7f9fd; color:{NAVY}; padding:8px; text-align:left; font-weight:700; white-space:nowrap; border-bottom:1px solid #e8ebf2; position:sticky; top:0;}}
+table.t td {{padding:8px; border-bottom:1px solid #f0f2f7; vertical-align:middle;}}
 .ap {{display:inline-block; padding:1px 8px; border-radius:9px; font-size:11px; font-weight:700; background:#eceff4; color:#8a93a3;}}
 .ap.on {{background:{BLUE}; color:#fff;}}
-.rt {{max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}}
-a.wa {{color:#1b8a4a; font-weight:600; text-decoration:none;}}
-.stTabs [data-baseweb="tab"] {{font-weight:600;}}
+.rt {{max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}}
+a.wa {{color:{BLUE}; font-weight:600; text-decoration:none; white-space:nowrap;}}
+.chip {{border:1px solid #dfe4ee; border-radius:8px; padding:7px 12px; font-size:12px; color:{NAVY}; background:#fff; white-space:nowrap; text-align:center;}}
+.st-key-ampm [role="radiogroup"] {{gap:0; flex-wrap:nowrap;}}
+.st-key-ampm label {{margin:0; padding:5px 22px; border:1px solid #dfe4ee; justify-content:center;}}
+.st-key-ampm label:first-child {{border-radius:8px 0 0 8px;}} .st-key-ampm label:last-child {{border-radius:0 8px 8px 0;}}
+.st-key-ampm label > div:first-child {{display:none;}}
+.st-key-ampm label:has(input:checked) {{background:{NAVY}; border-color:{NAVY};}}
+.st-key-ampm label:has(input:checked) p {{color:#fff;}}
+.foot {{display:flex; justify-content:space-between; font-size:11px; color:#6b7686; padding:10px 6px 0;}}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
 # =============================================================================
-# HEADER
+# HEADER + NAV BAR
 # =============================================================================
 now = datetime.now(timezone(timedelta(hours=4)))  # Gulf Standard Time
 with st.container(key="hdr"):
-    h1, h2, h3 = st.columns([6, 2, 1.6], vertical_alignment="center")
+    h1, h2, h3, h4 = st.columns([6, 2.2, 1.5, 1.1], vertical_alignment="center")
     h1.markdown(
-        '<div style="display:flex;align-items:center"><div class="logo">amazon<span>⌣</span></div>'
-        '<div style="font-size:28px;margin-right:14px">🚌</div><div>'
+        '<div style="display:flex;align-items:center"><div class="logo">amazon<small>⌣</small></div>'
+        '<div class="busbox">🚌</div><div>'
         '<div class="hdr-title">Daily Manpower &amp; Employee Transport Tracker</div>'
         '<div class="hdr-sub">Safe Journeys &nbsp;•&nbsp; On Time &nbsp;•&nbsp; A Better Tomorrow</div></div></div>',
         unsafe_allow_html=True,
     )
     h2.markdown(
-        f'<div style="text-align:right">📅 <b>{now.strftime("%a, %d %b %Y")}</b>'
-        f'<div class="hdr-sub">(Today) &nbsp; {now.strftime("%I:%M %p")} GST</div></div>',
+        f'<div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">📅 <div><b>{now.strftime("%a, %d %b %Y")}</b>'
+        f'<div class="hdr-sub">(Today) &nbsp; {now.strftime("%I:%M %p")} GST</div></div></div>',
         unsafe_allow_html=True,
     )
-    site = h3.selectbox("Site", ["All Sites", "DXB5", "AUH1", "DXB3"], label_visibility="collapsed")
+    site = h3.selectbox("Site", ["All Sites", "DXB5", "AUH1", "DXB3"], index=1, label_visibility="collapsed")
+    h4.markdown('<div style="display:flex;gap:10px;justify-content:flex-end"><span class="hbtn">🔔<b></b></span>'
+                '<span class="hbtn av">👤</span></div>', unsafe_allow_html=True)
 
+st.write("")
+with st.container(key="navbar"):
+    n1, n2, n3 = st.columns([5, 1.8, 0.8], vertical_alignment="center")
+    nav = n1.radio("Navigation", NAV, horizontal=True, label_visibility="collapsed", key="nav")
+    gq = n2.text_input("Search", placeholder="Search bus, location, or employee…", label_visibility="collapsed").strip()
+    with n3.popover("Filters", icon=":material/filter_alt:", use_container_width=True):
+        f_shift = st.radio("Shift", ["All", "AM", "PM"], horizontal=True)
+        f_stat = st.multiselect("Status", STATUSES, default=STATUSES)
+st.write("")
+
+# ---------- data used by every page ----------
 fleet = FLEET.copy()
 fleet["Status"] = fleet["Bus No"].map(lambda b: S.status.get(b, "On Route"))
 if S.manifest is not None and len(S.manifest) and "Bus No" in S.manifest.columns:
     fleet["Booked"] = fleet["Bus No"].map(S.manifest["Bus No"].value_counts()).fillna(0).astype(int)
 fl = fleet if site == "All Sites" else fleet[fleet["Site"] == site]
+if f_shift != "All":
+    fl = fl[fl["AMPM"] == f_shift]
+fl = fl[fl["Status"].isin(f_stat)]
 sched = full_schedule()
 sched = sched if site == "All Sites" else sched[sched["Site"] == site]
-
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["🚌 Live Bus Fleet", "🗺️ Pickup Timings & Routes", "👥 Pickup Headcounts", "📄 Employee Manifest (AMZ ID)"]
-)
+sched_q = sched[contains(sched, gq)] if gq else sched
 
 # =============================================================================
-# TAB 1 - LIVE BUS FLEET
+# PAGE 1 - LIVE BUS FLEET
 # =============================================================================
-with tab1:
+if nav == NAV[0]:
     cap, booked, nbus = int(fl["Capacity"].sum()), int(fl["Booked"].sum()), len(fl)
     delayed = fl[fl["Status"] == "Delayed"]
     pct = booked / cap if cap else 0
     ontime = (nbus - len(delayed)) / nbus if nbus else 0
+    avail = max(cap - booked, 0)
+
+    run_txt = (f'<div class="ok">● All Running</div>' if not len(delayed)
+               else f'<div class="bad">● {len(delayed)} delayed</div>')
+    delay_txt = (f'<div class="wn">0 Delays Today</div>' if not len(delayed)
+                 else f'<div class="bad">{len(delayed)} Delays Today</div>')
     k1, k2, k3, k4 = st.columns(4)
     k1.markdown(
-        f'<div class="kpi"><div class="ic" style="background:#dde9fb">🚌</div><div><div class="lb">Total Buses</div>'
-        f'<div class="v">{nbus}</div><div class="sb">Active Fleet</div></div></div>', unsafe_allow_html=True)
+        f'<div class="kpi"><div class="ic" style="background:#e3edfc">🚌</div><div><div class="lb">Total Buses</div>'
+        f'<div class="v">{nbus}</div>{run_txt}</div></div>', unsafe_allow_html=True)
     k2.markdown(
-        f'<div class="kpi"><div class="ic" style="background:#fde9d2">👥</div><div style="flex:1">'
+        f'<div class="kpi"><div class="ic" style="background:#dcf5e4">👥</div><div style="flex:1">'
         f'<div class="lb">Total Assigned Passengers</div><div class="v">{booked}</div>'
         f'<div class="sb">of {cap} Seats ({pct:.0%})</div>'
         f'<div class="bar"><div style="width:{min(pct, 1)*100:.0f}%"></div></div></div></div>', unsafe_allow_html=True)
     k3.markdown(
-        f'<div class="kpi"><div class="ic" style="background:#dde9fb">💺</div><div><div class="lb">Total Seat Capacity</div>'
+        f'<div class="kpi"><div class="ic" style="background:#e3edfc">💺</div><div><div class="lb">Total Seat Capacity</div>'
         f'<div class="v">{cap}</div><div class="sb">Across {nbus} Buses</div></div></div>', unsafe_allow_html=True)
     k4.markdown(
-        f'<div class="kpi"><div class="ic" style="background:#dcf5e4">⏱️</div><div><div class="lb">On-Time Pickups</div>'
-        f'<div class="v">{ontime:.0%}</div><div class="sb">{len(delayed)} Delays Today</div></div></div>', unsafe_allow_html=True)
+        f'<div class="kpi warm"><div class="ic" style="background:#fde9d2">⏱️</div><div><div class="lb">On-Time Pickups</div>'
+        f'<div class="v">{ontime:.0%}</div>{delay_txt}</div></div>', unsafe_allow_html=True)
 
-    left, right = st.columns([2.9, 1.1])
+    st.write("")
+    msite = "DXB5" if site == "All Sites" else site
+    gmap = quote(MAPS[msite])
 
-    with left:
-        with st.container(key="card_chart"):
-            st.markdown(f'<div class="card-t">💺 Seat Map · {SEATS} seats per bus</div>', unsafe_allow_html=True)
-            d1, d2 = st.columns([1, 3], vertical_alignment="center")
+    # ---------------- row 2: map | seat utilization | fleet status ----------------
+    c_map, c_util, c_fs = st.columns([1.5, 1.25, 1.0])
+
+    with c_map:
+        with st.container(key="card_map"):
+            st.markdown(
+                '<div class="card-h"><div><div class="card-t">📍 Live Bus Fleet</div>'
+                '<div class="card-s">Real-time tracking of all buses</div></div>'
+                '<div class="lg"><span class="dot" style="background:#1fa855"></span>On Route'
+                '<span class="dot" style="background:#f7941d"></span>At Pickup'
+                '<span class="dot" style="background:#e53935"></span>Delayed'
+                '<span class="dot" style="background:#7a8699"></span>Offline</div></div>',
+                unsafe_allow_html=True)
+            components.html(
+                f'<iframe src="https://maps.google.com/maps?q={gmap}&z=11&output=embed" width="100%" '
+                f'height="300" style="border:0;border-radius:10px" loading="lazy"></iframe>', height=310)
+            st.link_button("🗺️ View Full Map", f"https://www.google.com/maps/search/?api=1&query={gmap}")
+
+    with c_util:
+        with st.container(key="card_util"):
+            st.markdown(
+                f'<div class="card-h"><div class="card-t">📊 Bus Seat Utilization</div>'
+                f'<div class="lnk">View Details →</div></div>', unsafe_allow_html=True)
+            d1, d2 = st.columns([1, 1.15], vertical_alignment="center")
             filled = min(booked, cap)
-            fig = go.Figure(go.Pie(values=[filled, max(cap - filled, 0)], hole=0.72, sort=False, textinfo="none",
-                                   marker=dict(colors=[ORANGE, "#dfe6f3"]), hoverinfo="skip"))
-            fig.update_layout(height=230, margin=dict(l=0, r=0, t=0, b=0), showlegend=False, paper_bgcolor="white",
-                              annotations=[dict(text=f"<b>{pct:.0%}</b><br>seats filled", showarrow=False, font=dict(size=17, color=NAVY))])
-            d1.plotly_chart(fig, use_container_width=True)
-            cards = []
-            for _, b in fl.iterrows():
-                a_, over = int(b["Booked"]), int(b["Booked"]) - SEATS
-                dots = "".join(f'<i class="{"f" if i < min(a_, SEATS) else ""}"></i>' for i in range(SEATS))
-                tag = f'<span class="ov">+{over} over</span>' if over > 0 else f'<span class="ok">{SEATS - a_} free</span>'
-                cards.append(
-                    f'<div class="bc"><div class="bh"><b>🚌 {esc(b["Bus No"])}</b>{pill(b["Status"])}</div>'
-                    f'<div class="seats">{dots}</div><div class="bf"><span>{a_} / {SEATS} seats</span>{tag}</div></div>')
-            d2.markdown('<div class="lg">🟧 Assigned &nbsp; ⬜ Free seat</div><div class="bgrid">' + "".join(cards) + "</div>",
+            fig = go.Figure(go.Pie(values=[filled, max(cap - filled, 0)], hole=0.74, sort=False, textinfo="none",
+                                   marker=dict(colors=[BLUE, "#e3e8f2"]), hoverinfo="skip"))
+            fig.update_layout(height=170, margin=dict(l=0, r=0, t=0, b=0), showlegend=False, paper_bgcolor="white",
+                              annotations=[dict(text=f"<b>{pct:.0%}</b><br><span style='font-size:10px'>Overall<br>Utilization</span>",
+                                                showarrow=False, font=dict(size=20, color=NAVY))])
+            d1.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            d2.markdown(
+                f'<div class="stat"><span><i class="sd" style="background:{BLUE}"></i>Assigned Passengers</span><b>{booked}</b></div>'
+                f'<div class="stat"><span><i class="sd" style="background:#c9d1e0"></i>Available Seats</span><b>{avail}</b></div>'
+                f'<div class="stat" style="border-top:1px solid #eef0f5"><span>Total Capacity</span><b>{cap}</b></div>',
+                unsafe_allow_html=True)
+            st.markdown('<div style="font-weight:700;font-size:12.5px;color:#0f2147;margin:4px 0">Seat Usage by Bus</div>',
                         unsafe_allow_html=True)
+            rows_u = []
+            for _, b in fl.iterrows():
+                a_ = int(b["Booked"])
+                r_ = a_ / SEATS
+                col = "#e53935" if r_ > 1 else (ORANGE if r_ >= 0.9 else BLUE)
+                rows_u.append(
+                    f'<div class="ub"><span><b>{esc(b["Bus No"])}</b></span>'
+                    f'<span class="tr"><div style="width:{min(r_, 1)*100:.0f}%;background:{col}"></div></span>'
+                    f'<span>{a_}/{SEATS}</span><span><b>{r_:.0%}</b></span></div>')
+            st.markdown(f'<div class="ubox">{"".join(rows_u)}</div>', unsafe_allow_html=True)
 
+    with c_fs:
+        with st.container(key="card_fs"):
+            ok_all = "● All Buses Running" if not len(delayed) else f"● {len(delayed)} Delayed"
+            ok_col = GREEN if not len(delayed) else "#c62828"
+            st.markdown(
+                f'<div class="card-h"><div class="card-t">🔔 Live Fleet Status</div>'
+                f'<div class="lg" style="color:{ok_col};font-weight:600">{ok_all} &nbsp;<span class="lnk">View All →</span></div></div>',
+                unsafe_allow_html=True)
+            items = "".join(
+                f'<div class="fs-row"><span style="font-size:20px">🚌</span>'
+                f'<div><div class="bn">{esc(b["Bus No"])}</div>'
+                f'<div class="rt2">({esc(short_route(b["Route"]))} → {esc(b["Site"])})</div></div>'
+                f'{pill(b["Status"])}<span class="tm">{esc(b["ShiftTime"])}</span></div>'
+                for _, b in fl.iterrows()
+            )
+            st.markdown(f'<div class="fs">{items}</div>', unsafe_allow_html=True)
+            with st.expander("Update bus status"):
+                if len(fl):
+                    bus_u = st.selectbox("Bus", fl["Bus No"].tolist())
+                    new = st.selectbox("Status", STATUSES)
+                    if st.button("Save status", use_container_width=True):
+                        S.status[bus_u] = new
+                        save_status()
+                        st.rerun()
+
+    # ---------------- row 3: schedule | snapshot + alerts ----------------
+    c_sch, c_right = st.columns([2.75, 1.0])
+
+    with c_sch:
         with st.container(key="card_sched"):
-            s1, s2 = st.columns([4, 1], vertical_alignment="center")
-            s1.markdown('<div class="card-t">📅 Pickup Schedule &amp; Live Locations</div>', unsafe_allow_html=True)
-            ampm = s2.radio("Shift", ["AM", "PM"], horizontal=True, label_visibility="collapsed")
+            s1, s2, s3 = st.columns([3.2, 1.3, 1.1], vertical_alignment="center")
+            s1.markdown('<div class="card-t">🚌 Pickup Schedule &amp; Live Locations</div>', unsafe_allow_html=True)
+            s2.markdown(f'<div class="chip">📅 {now.strftime("%a, %d %b %Y")}</div>', unsafe_allow_html=True)
+            ampm = s3.radio("Shift", ["AM", "PM"], horizontal=True, label_visibility="collapsed", key="ampm")
             rows, n = [], 0
             for _, b in fl[fl["AMPM"] == ampm].iterrows():
-                sub = sched[sched["Bus No"] == b["Bus No"]]
-                stops = list(zip(sub["Pickup Location"], sub["Pickup Time"])) or [("Timings not loaded", "—")]
+                sub = sched_q[sched_q["Bus No"] == b["Bus No"]]
+                stops = list(zip(sub["Pickup Location"], sub["Pickup Time"]))
+                if not stops and not gq:
+                    stops = [("Timings not loaded", "—")]
                 for loc, t in stops:
                     n += 1
                     am_t, pm_t = (t, "—") if ampm == "AM" else ("—", t)
@@ -378,74 +511,74 @@ with tab1:
                         f'<span class="ap {"on" if ampm == "PM" else ""}">PM</span></td>'
                         f'<td>{am_t}</td><td>{pm_t}</td><td>{esc(b["Vendor"])}</td><td><b>{esc(b["Bus No"])}</b></td>'
                         f'<td>{b["Booked"]}</td><td>{b["Capacity"]}</td>'
-                        f'<td><a class="wa" href="{esc(b["Live"])}" target="_blank">💬 View Live Location</a></td>'
+                        f'<td><a class="wa" href="{esc(b["Live"])}" target="_blank">💬 View Location</a></td>'
                         f'<td>{pill(b["Status"])}</td></tr>'
                     )
-            head = ("<tr><th>#</th><th>Pickup Location</th><th>Route / Area</th><th>Shift</th><th>AM</th><th>PM</th>"
-                    "<th>Vendor</th><th>Bus No.</th><th>Assigned</th><th>Seat Capacity</th><th>Live Location</th><th>Status</th></tr>")
+            head = ('<tr><th rowspan="2">#</th><th rowspan="2">Pickup Location</th><th rowspan="2">Route / Area</th>'
+                    '<th rowspan="2">Shift</th><th colspan="2" style="text-align:center">Departure Timings</th>'
+                    '<th rowspan="2">Vendor</th><th rowspan="2">Bus No.</th><th rowspan="2">Assigned</th>'
+                    '<th rowspan="2">Seat Cap.</th><th rowspan="2">Live Location</th><th rowspan="2">Status</th></tr>'
+                    '<tr><th style="top:32px">AM</th><th style="top:32px">PM</th></tr>')
             st.markdown(f'<div class="tbl-wrap"><table class="t">{head}{"".join(rows)}</table></div>', unsafe_allow_html=True)
 
-    with right:
-        with st.container(key="card_fs"):
-            st.markdown('<div class="card-t">Live Fleet Status</div>', unsafe_allow_html=True)
-            items = "".join(
-                f'<div class="fs-row"><span>🚌 <b>{esc(b["Bus No"])}</b></span>{pill(b["Status"])}'
-                f'<span style="color:#6b7686">{esc(b["ShiftTime"])}</span></div>'
-                for _, b in fl.iterrows()
-            )
-            st.markdown(f'<div class="fs">{items}</div>', unsafe_allow_html=True)
-            with st.expander("Update bus status"):
-                bus = st.selectbox("Bus", fl["Bus No"].tolist())
-                new = st.selectbox("Status", STATUSES)
-                if st.button("Save status", use_container_width=True):
-                    S.status[bus] = new
-                    save_status()
-                    st.rerun()
-
-        with st.container(key="card_map"):
-            msite = "DXB5" if site == "All Sites" else site
-            st.markdown(f'<div class="card-t">📍 Live Map · {msite}</div>', unsafe_allow_html=True)
+    with c_right:
+        with st.container(key="card_snap"):
+            st.markdown('<div class="card-h"><div class="card-t">🔔 Live Map Snapshot</div></div>', unsafe_allow_html=True)
             components.html(
-                f'<iframe src="https://maps.google.com/maps?q={quote(MAPS[msite])}&z=13&output=embed" width="100%" '
-                f'height="240" style="border:0;border-radius:12px" loading="lazy"></iframe>', height=250)
-            st.link_button("🗺️ Open full map", f"https://www.google.com/maps/search/?api=1&query={quote(MAPS[msite])}",
+                f'<iframe src="https://maps.google.com/maps?q={gmap}&z=12&output=embed" width="100%" '
+                f'height="150" style="border:0;border-radius:10px" loading="lazy"></iframe>', height=158)
+            st.link_button("Open Live Map →", f"https://www.google.com/maps/search/?api=1&query={gmap}",
                            use_container_width=True)
 
-        with st.container(key="card_qa"):
-            st.markdown('<div class="card-t">⚡ Quick Actions</div>', unsafe_allow_html=True)
-            report = to_excel({"Fleet": fl.drop(columns=["AMPM", "ShiftTime", "Live"]), "Pickups": sched})
-            with st.container(key="qa_export"):
-                st.download_button("📥  Export Report (Excel)", report, f"transport_report_{now:%Y%m%d}.xlsx",
-                                   use_container_width=True)
-            with st.container(key="qa_wa"):
-                with st.expander("💬  WhatsApp All Drivers"):
-                    msg = st.text_input("Message", "Good morning, please share your live location.")
-                    st.markdown("\n".join(
-                        f"- [{r['Bus No']} · {r['Driver Name']}](https://wa.me/{r['Phone']}?text={quote(msg)})"
-                        for _, r in fl.iterrows()))
-            with st.container(key="qa_delay"):
-                with st.expander(f"🚨  Delayed Buses ({len(delayed)})"):
-                    if len(delayed):
-                        st.dataframe(delayed[["Bus No", "Route", "Vendor", "Driver Name", "Phone"]], hide_index=True)
-                    else:
-                        st.success("✅ No delayed buses.")
-            with st.container(key="qa_print"):
-                man = S.manifest if S.manifest is not None else pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location"])
-                st.download_button("🖨️  Print Manifest (CSV)", man.to_csv(index=False), "manifest.csv", use_container_width=True)
+        st.write("")
+        with st.container(key="card_alerts"):
+            tm = now.strftime("%I:%M %p")
+            over = fl[fl["Booked"] > SEATS]
+            alerts = []
+            if len(delayed):
+                for _, b in delayed.iterrows():
+                    alerts.append(("#e53935", "!", f'{b["Bus No"]} is delayed'))
+            else:
+                alerts += [(GREEN, "✓", "All buses are running as per schedule"), (BLUE, "i", "No delays reported")]
+            if len(over):
+                alerts.append((ORANGE, "!", f'{len(over)} bus(es) over seat capacity: {", ".join(over["Bus No"])}'))
+            else:
+                alerts.append((ORANGE, "!", "Headcount matches with capacity"))
+            st.markdown('<div class="card-h"><div class="card-t">🔔 Alerts &amp; Notifications</div>'
+                        '<div class="lnk">View All →</div></div>', unsafe_allow_html=True)
+            st.markdown("".join(
+                f'<div class="al"><span class="ai" style="background:{c}">{i}</span><span>{esc(t)}</span>'
+                f'<span class="tm">{tm}</span></div>' for c, i, t in alerts), unsafe_allow_html=True)
+
+    # ---------------- quick actions (kept from the original app) ----------------
+    st.write("")
+    with st.container(key="card_qa"):
+        st.markdown('<div class="card-t">⚡ Quick Actions</div>', unsafe_allow_html=True)
+        qa1, qa2, qa3, qa4 = st.columns(4)
+        report = to_excel({"Fleet": fl.drop(columns=["AMPM", "ShiftTime", "Live"]), "Pickups": sched})
+        qa1.download_button("📥  Export Report (Excel)", report, f"transport_report_{now:%Y%m%d}.xlsx",
+                            use_container_width=True)
+        with qa2.popover("💬  WhatsApp All Drivers", use_container_width=True):
+            msg = st.text_input("Message", "Good morning, please share your live location.")
+            st.markdown("\n".join(
+                f"- [{r['Bus No']} · {r['Driver Name']}](https://wa.me/{r['Phone']}?text={quote(msg)})"
+                for _, r in fl.iterrows()))
+        with qa3.popover(f"🚨  Delayed Buses ({len(delayed)})", use_container_width=True):
+            if len(delayed):
+                st.dataframe(delayed[["Bus No", "Route", "Vendor", "Driver Name", "Phone"]], hide_index=True)
+            else:
+                st.success("✅ No delayed buses.")
+        man_q = S.manifest if S.manifest is not None else pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location"])
+        qa4.download_button("🖨️  Print Manifest (CSV)", man_q.to_csv(index=False), "manifest.csv", use_container_width=True)
 
 # =============================================================================
-# TAB 2 - PICKUP TIMINGS & ROUTES
+# PAGE 2 - PICKUP TIMINGS & ROUTES
 # =============================================================================
-with tab2:
-    q1, q2 = st.columns([1, 2])
-    which = q1.radio("Shift", ["All", "AM", "PM"], horizontal=True)
-    text = q2.text_input("Search bus, location or vendor")
-    view = sched.merge(fleet[["Bus No", "AMPM", "Route", "Status"]], on="Bus No", how="left")
+elif nav == NAV[1]:
+    which = st.radio("Shift", ["All", "AM", "PM"], horizontal=True)
+    view = sched_q.merge(fleet[["Bus No", "AMPM", "Route", "Status"]], on="Bus No", how="left")
     if which != "All":
         view = view[view["AMPM"] == which]
-    if text:
-        mask = view.astype(str).apply(lambda c: c.str.contains(text, case=False)).any(axis=1)
-        view = view[mask]
     st.dataframe(view[["Site", "Shift", "Bus No", "Pickup Location", "Pickup Time", "Route", "Vendor", "Coordinator", "Status"]],
                  hide_index=True, use_container_width=True)
     loaded = set(sched["Bus No"])
@@ -478,8 +611,9 @@ with tab2:
             except Exception as e:
                 st.error(f"Could not read the file: {e}")
 
+
 # =============================================================================
-# TAB 3 - PICKUP HEADCOUNTS  (click a bus to see / edit who is travelling)
+# PAGE 3 - PICKUP HEADCOUNTS  (click a bus to see / edit who is travelling)
 # =============================================================================
 def stops_for(bus_no):
     route = FLEET.loc[FLEET["Bus No"] == bus_no, "Route"].iloc[0]
@@ -487,7 +621,7 @@ def stops_for(bus_no):
     return list(dict.fromkeys(known + route.split(" / ")))
 
 
-with tab3:
+if nav == NAV[2]:
     hc = fl[["Site", "Shift", "Bus No", "Route", "Capacity", "Booked"]].copy().reset_index(drop=True)
     hc["Free Seats"] = hc["Capacity"] - hc["Booked"]
     hc["Occupancy"] = (hc["Booked"] / hc["Capacity"] * 100).round(0)
@@ -575,9 +709,9 @@ with tab3:
                 st.warning(f"⚠️ {bus} has {len(mine)} employees but only {SEATS} seats.")
 
 # =============================================================================
-# TAB 4 - EMPLOYEE MANIFEST
+# PAGE 4 - EMPLOYEE MANIFEST
 # =============================================================================
-with tab4:
+elif nav == NAV[3]:
     st.caption("Upload the roster with columns: AMZ ID, Employee Name, Bus No, Pickup Location (optional: Shift).")
     tpl = pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location", "Shift"])
     st.download_button("Download template", tpl.to_csv(index=False), "manifest_template.csv")
@@ -601,13 +735,19 @@ with tab4:
     m = S.manifest
     if m is not None:
         f1, f2 = st.columns([2, 1])
-        look = f1.text_input("Search by AMZ ID or name")
+        look = f1.text_input("Search by AMZ ID or name", value=gq)
         v = m
         if site != "All Sites" and "Bus No" in m.columns:
             v = m[m["Bus No"].isin(fl["Bus No"])]
         if look:
-            v = v[v.astype(str).apply(lambda c: c.str.contains(look, case=False)).any(axis=1)]
+            v = v[contains(v, look)]
         f2.metric("Employees", len(v))
         st.dataframe(v, hide_index=True, use_container_width=True)
     else:
         st.info("No manifest uploaded yet.")
+
+st.markdown(
+    '<div class="foot"><span>Amazon Employee Transport Management &nbsp;|&nbsp; DXB5, DXB3 &amp; AUH1 Sites</span>'
+    '<span><span style="color:#f7941d">⌣</span> &nbsp;Safe Rides &nbsp;•&nbsp; Punctual Workforce &nbsp;•&nbsp; A Stronger Amazon</span></div>',
+    unsafe_allow_html=True,
+)
