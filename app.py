@@ -1,19 +1,23 @@
-# Transport Module for Streamlit App
-st.subheader("🚌 Employee Transport & Bus Tracking")
+# Bus & Driver Live Tracking Module
+st.subheader("📍 Bus Driver Live Location & Tracking")
 
-# Filters for Site and Shift
-col1, col2, col3 = st.columns(3)
-selected_site = col1.selectbox("Select Site", ["AUH1", "DXB5", "DXB3"])
-selected_shift = col2.selectbox("Select Shift", ["Day Shift", "Mid Shift", "Night Shift"])
-selected_bus = col3.selectbox("Select Bus Number", ["All", "Bus 01", "Bus 02", "Bus 03"]) # Aap isko dataframe se dynamically fetch kar sakte hain
+# Sample data for buses, drivers and their WhatsApp links
+bus_tracking_data = [
+    {"Bus No": "DXB-01", "Route": "Sahara / DAFZA", "Driver Name": "Driver 1", "Phone": "+971501234567", "WhatsApp Link": "https://wa.me/971501234567"},
+    {"Bus No": "DXB-02", "Route": "Metro Stations", "Driver Name": "Driver 2", "Phone": "+971507654321", "WhatsApp Link": "https://wa.me/971507654321"},
+    {"Bus No": "AUH-01", "Route": "ICAD & Razeen", "Driver Name": "Driver 3", "Phone": "+971559876543", "WhatsApp Link": "https://wa.me/971559876543"}
+]
 
-# Metrics Overview
-m1, m2, m3 = st.columns(3)
-m1.metric("Total Assigned Buses", "5")
-m2.metric("Total Passengers Scheduled", "180")
-m3.metric("Capacity Utilization", "92%")
+import pandas as pd
+tracking_df = pd.DataFrame(bus_tracking_data)
 
-# Display Passenger List per Bus
-st.markdown(f"### Passenger Manifest for {selected_site} - {selected_shift}")
-# Yahan aap apni transport dataframe ko filter karke show karenge
-# show_df(filtered_transport_df)
+# Display table with clickable action links
+for index, row in tracking_df.iterrows():
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    col1.write(f"**{row['Bus No']}** ({row['Route']})")
+    col2.write(f"Driver: {row['Driver Name']}")
+    col3.write(f"Phone: {row['Phone']}")
+    if col4.button(f"💬 Chat / Live Loc", key=f"btn_{index}"):
+        st.markdown(f"[Click here to open WhatsApp chat]({row['WhatsApp Link']})")
+
+st.caption("Note: Drivers apni live location WhatsApp par share karenge, jiska link yahan update kiya ja sakta hai.")
