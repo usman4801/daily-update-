@@ -175,10 +175,21 @@ def save_status():
         pass
 
 
+def clean_manifest(d):
+    """Trim spaces and normalise Bus No (e.g. ' dxb 01 ' -> 'DXB-01') so counts match the fleet."""
+    d = d.copy().fillna("")
+    for c in MAN_COLS:
+        if c not in d.columns:
+            d[c] = ""
+        d[c] = d[c].astype(str).str.strip()
+    d["Bus No"] = d["Bus No"].str.upper().str.replace(r"\s+", "-", regex=True)
+    return d[MAN_COLS + [c for c in d.columns if c not in MAN_COLS]].reset_index(drop=True)
+
+
 def load_manifest():
     try:
         d = pd.read_csv(MANIFEST_FILE, dtype=str).fillna("")
-        return d if len(d) else None
+        return clean_manifest(d) if len(d) else None
     except Exception:
         return None
 
@@ -245,7 +256,7 @@ st.markdown(
 [data-testid="stSidebar"], [data-testid="collapsedControl"] {{display:none !important;}}
 header[data-testid="stHeader"] {{background:transparent;}}
 .stApp {{background:#f2f5fb;}}
-.block-container {{padding-top:3.4rem; padding-bottom:1.2rem; max-width:1600px;}}
+.block-container, [data-testid="stMainBlockContainer"] {{padding:3.2rem 1.2rem 1rem 1.2rem !important; max-width:100% !important; width:100% !important;}}
 
 /* ---------- top header ---------- */
 .st-key-hdr {{background:{NAVY}; border-radius:12px; padding:8px 22px; color:#fff;}}
@@ -257,17 +268,18 @@ header[data-testid="stHeader"] {{background:transparent;}}
 .hbtn {{display:inline-flex; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; font-size:20px; position:relative;}}
 .hbtn.av {{background:#fff; color:{NAVY};}}
 .hbtn b {{position:absolute; top:4px; right:5px; width:9px; height:9px; border-radius:50%; background:#ff5a3c;}}
-.st-key-hdr [data-baseweb="select"] > div {{background:rgba(255,255,255,.08); border:0; color:#fff;}}
-.st-key-hdr [data-baseweb="select"] * {{color:#fff !important; fill:#fff !important;}}
+.st-key-hdr [data-testid="stSelectbox"] {{border:1px solid rgba(255,255,255,.35); border-radius:8px;}}
+.st-key-hdr [data-testid="stSelectbox"] * {{background:transparent !important; color:#fff !important; fill:#fff !important; border-color:transparent !important;}}
 
 /* ---------- nav bar ---------- */
 .st-key-navbar {{background:#fff; border-radius:12px; padding:0 10px; box-shadow:0 1px 4px rgba(15,33,71,.08);}}
 .st-key-navbar [role="radiogroup"] {{width:100%; gap:0; flex-wrap:nowrap;}}
 .st-key-navbar [role="radiogroup"] label {{flex:1; justify-content:center; margin:0; padding:15px 8px; border-bottom:3px solid transparent; cursor:pointer;}}
-.st-key-navbar [role="radiogroup"] label > div:first-child {{display:none;}}
+.st-key-navbar label[data-baseweb="radio"] > span, .st-key-navbar label[data-baseweb="radio"] > div:not(:has(p)),
+.st-key-ampm label[data-baseweb="radio"] > span, .st-key-ampm label[data-baseweb="radio"] > div:not(:has(p)) {{display:none !important;}}
 .st-key-navbar [role="radiogroup"] label p {{font-weight:600; font-size:14px; color:{NAVY};}}
-.st-key-navbar [role="radiogroup"] label:has(input:checked) {{border-bottom-color:{ORANGE}; background:#fff5e9;}}
-.st-key-navbar [role="radiogroup"] label:has(input:checked) p {{color:{ORANGE};}}
+.st-key-navbar [role="radiogroup"] label:has(input:checked) {{border-bottom-color:{ORANGE}; background:#eef3fc;}}
+.st-key-navbar [role="radiogroup"] label:has(input:checked) p {{color:{NAVY}; font-weight:800;}}
 
 /* ---------- cards ---------- */
 [class*="st-key-card"] {{background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(15,33,71,.08);}}
@@ -324,7 +336,6 @@ a.wa {{color:{BLUE}; font-weight:600; text-decoration:none; white-space:nowrap;}
 .st-key-ampm [role="radiogroup"] {{gap:0; flex-wrap:nowrap;}}
 .st-key-ampm label {{margin:0; padding:5px 22px; border:1px solid #dfe4ee; justify-content:center;}}
 .st-key-ampm label:first-child {{border-radius:8px 0 0 8px;}} .st-key-ampm label:last-child {{border-radius:0 8px 8px 0;}}
-.st-key-ampm label > div:first-child {{display:none;}}
 .st-key-ampm label:has(input:checked) {{background:{NAVY}; border-color:{NAVY};}}
 .st-key-ampm label:has(input:checked) p {{color:#fff;}}
 .foot {{display:flex; justify-content:space-between; font-size:11px; color:#6b7686; padding:10px 6px 0;}}
@@ -368,8 +379,9 @@ st.write("")
 # ---------- data used by every page ----------
 fleet = FLEET.copy()
 fleet["Status"] = fleet["Bus No"].map(lambda b: S.status.get(b, "On Route"))
-if S.manifest is not None and len(S.manifest) and "Bus No" in S.manifest.columns:
-    fleet["Booked"] = fleet["Bus No"].map(S.manifest["Bus No"].value_counts()).fillna(0).astype(int)
+# Passenger counts come ONLY from the employee manifest (the typed "Booked" numbers in FLEET_ROWS are not used)
+_man = S.manifest if S.manifest is not None else pd.DataFrame(columns=MAN_COLS)
+fleet["Booked"] = fleet["Bus No"].map(_man["Bus No"].value_counts()).fillna(0).astype(int)
 fl = fleet if site == "All Sites" else fleet[fleet["Site"] == site]
 if f_shift != "All":
     fl = fl[fl["AMPM"] == f_shift]
@@ -382,11 +394,13 @@ sched_q = sched[contains(sched, gq)] if gq else sched
 # PAGE 1 - LIVE BUS FLEET
 # =============================================================================
 if nav == NAV[0]:
+    if S.manifest is None or not len(S.manifest):
+        st.info("No passenger manifest loaded yet - upload it in the Employee Manifest tab. Passenger counts show 0 until then.")
     cap, booked, nbus = int(fl["Capacity"].sum()), int(fl["Booked"].sum()), len(fl)
     delayed = fl[fl["Status"] == "Delayed"]
     pct = booked / cap if cap else 0
     ontime = (nbus - len(delayed)) / nbus if nbus else 0
-    avail = max(cap - booked, 0)
+    avail = int((fl["Capacity"] - fl["Booked"]).clip(lower=0).sum())
 
     run_txt = (f'<div class="ok">● All Running</div>' if not len(delayed)
                else f'<div class="bad">● {len(delayed)} delayed</div>')
@@ -540,10 +554,12 @@ if nav == NAV[0]:
                     alerts.append(("#e53935", "!", f'{b["Bus No"]} is delayed'))
             else:
                 alerts += [(GREEN, "✓", "All buses are running as per schedule"), (BLUE, "i", "No delays reported")]
-            if len(over):
+            if S.manifest is None or not len(S.manifest):
+                alerts.append((ORANGE, "!", "No passenger manifest loaded"))
+            elif len(over):
                 alerts.append((ORANGE, "!", f'{len(over)} bus(es) over seat capacity: {", ".join(over["Bus No"])}'))
             else:
-                alerts.append((ORANGE, "!", "Headcount matches with capacity"))
+                alerts.append((GREEN, "✓", "Headcount matches with capacity"))
             st.markdown('<div class="card-h"><div class="card-t">🔔 Alerts &amp; Notifications</div>'
                         '<div class="lnk">View All →</div></div>', unsafe_allow_html=True)
             st.markdown("".join(
@@ -613,7 +629,7 @@ elif nav == NAV[1]:
 
 
 # =============================================================================
-# PAGE 3 - PICKUP HEADCOUNTS  (click a bus to see / edit who is travelling)
+# PAGE 3 - PICKUP HEADCOUNTS  (numbers come ONLY from the employee manifest)
 # =============================================================================
 def stops_for(bus_no):
     route = FLEET.loc[FLEET["Bus No"] == bus_no, "Route"].iloc[0]
@@ -621,11 +637,82 @@ def stops_for(bus_no):
     return list(dict.fromkeys(known + route.split(" / ")))
 
 
+def pax_table(mine, bus_no, sc_all):
+    """Passenger list for one bus, in pickup order, with pickup time."""
+    sc = sc_all[sc_all["Bus No"] == bus_no]
+    tmap = dict(zip(sc["Pickup Location"], sc["Pickup Time"]))
+    order = {loc: i for i, loc in enumerate(sc["Pickup Location"])}
+    t = mine.copy()
+    t["Pickup Time"] = t["Pickup Location"].map(tmap).fillna("—")
+    t["_o"] = t["Pickup Location"].map(order).fillna(999)
+    t = t.sort_values(["_o", "Employee Name"]).drop(columns="_o")
+    t.insert(0, "#", range(1, len(t) + 1))
+    return t[["#", "AMZ ID", "Employee Name", "Pickup Location", "Pickup Time", "Shift"]]
+
+
+def data_checks(man, buses_df):
+    """Return [(level, text)] describing whether the headcount data can be trusted."""
+    if man is None or not len(man):
+        return [("info", "No manifest loaded yet. Upload it in the Employee Manifest tab - every count is 0 until then.")]
+    out = []
+    in_view = man[man["Bus No"].isin(buses_df["Bus No"])]
+    out.append(("ok", f"{len(man)} employees in the manifest · {len(in_view)} assigned to the {len(buses_df)} bus(es) in this view."))
+    unknown = man[~man["Bus No"].isin(set(FLEET["Bus No"]))]
+    if len(unknown):
+        names = ", ".join(list(unknown["Bus No"].replace("", "(blank)").unique())[:5])
+        out.append(("warn", f"{len(unknown)} employee(s) have a missing or unknown Bus No ({names}). They are not counted on any bus."))
+    ids = man["AMZ ID"].str.lower()
+    if (ids == "").sum():
+        out.append(("warn", f"{int((ids == '').sum())} row(s) have no AMZ ID."))
+    dups = man[(ids != "") & ids.duplicated(keep=False)]
+    if len(dups):
+        eg = ", ".join(list(dups["AMZ ID"].unique())[:5])
+        out.append(("warn", f"{dups['AMZ ID'].str.lower().nunique()} AMZ ID(s) appear more than once, so they are counted twice (e.g. {eg})."))
+    if len(in_view[in_view["Pickup Location"] == ""]):
+        out.append(("warn", f"{len(in_view[in_view['Pickup Location'] == ''])} employee(s) have no pickup location."))
+    shift = FLEET.set_index("Bus No")["Shift"]
+    sm = in_view[(in_view["Shift"] != "") & (in_view["Shift"] != in_view["Bus No"].map(shift))]
+    if len(sm):
+        out.append(("warn", f"{len(sm)} employee(s) have a Shift that differs from their bus's shift."))
+    over = buses_df[buses_df["Booked"] > SEATS]
+    if len(over):
+        out.append(("warn", f"{len(over)} bus(es) over {SEATS} seats: " + ", ".join(f"{r['Bus No']} ({r['Booked']})" for _, r in over.iterrows())))
+    else:
+        out.append(("ok", f"No bus is over its {SEATS} seats."))
+    known = {b: {s.lower() for s in stops_for(b)} for b in buses_df["Bus No"]}
+    odd_mask = pd.Series([bool(loc) and loc.lower() not in known[b] for b, loc in
+                          zip(in_view["Bus No"], in_view["Pickup Location"])], index=in_view.index, dtype=bool)
+    if odd_mask.sum():
+        out.append(("info", f"{int(odd_mask.sum())} employee(s) have a pickup location that is not in their bus's stop list (check the spelling)."))
+    return out
+
+
 if nav == NAV[2]:
-    hc = fl[["Site", "Shift", "Bus No", "Route", "Capacity", "Booked"]].copy().reset_index(drop=True)
-    hc["Free Seats"] = hc["Capacity"] - hc["Booked"]
-    hc["Occupancy"] = (hc["Booked"] / hc["Capacity"] * 100).round(0)
-    st.caption("👆 Click a bus row to see who is travelling. You can add, remove or move employees below it.")
+    man = S.manifest if S.manifest is not None else pd.DataFrame(columns=MAN_COLS)
+    sc_all = full_schedule()
+    has_man = S.manifest is not None and len(S.manifest) > 0
+
+    hc = fl[["Site", "Shift", "Bus No", "Route", "Capacity", "Booked"]].rename(columns={"Booked": "Assigned"}).reset_index(drop=True)
+    hc["Free Seats"] = (hc["Capacity"] - hc["Assigned"]).clip(lower=0)
+    hc["Over By"] = (hc["Assigned"] - hc["Capacity"]).clip(lower=0)
+    hc["Occupancy"] = (hc["Assigned"] / hc["Capacity"] * 100).round(0)
+    hc["Check"] = [
+        (f"⚠️ Over by {o}" if o else ("— No passengers" if a == 0 else ("Full" if f == 0 else "✅ OK")))
+        for a, f, o in zip(hc["Assigned"], hc["Free Seats"], hc["Over By"])
+    ]
+
+    t1, t2, t3, t4 = st.columns(4)
+    t1.metric("Passengers assigned", int(hc["Assigned"].sum()))
+    t2.metric("Seats (all buses)", int(hc["Capacity"].sum()))
+    t3.metric("Free seats", int(hc["Free Seats"].sum()))
+    t4.metric("Buses over capacity", int((hc["Over By"] > 0).sum()))
+
+    issues = data_checks(S.manifest, fl)
+    with st.expander("🔎 Data check - are these numbers right?", expanded=any(l == "warn" for l, _ in issues) or not has_man):
+        for lvl, txt in issues:
+            {"ok": st.success, "warn": st.warning, "info": st.info}[lvl](txt)
+
+    st.caption("👆 Click a bus row to see who is travelling and edit it. With no bus selected, the headcount at every pickup point is shown below.")
     bus = None
     cfg = {"Occupancy": st.column_config.ProgressColumn("Occupancy %", min_value=0, max_value=100, format="%d%%")}
     try:
@@ -635,26 +722,47 @@ if nav == NAV[2]:
             bus = hc.iloc[ev.selection.rows[0]]["Bus No"]
     except TypeError:  # older Streamlit without row selection
         st.dataframe(hc, hide_index=True, use_container_width=True, column_config=cfg)
-        bus = st.selectbox("Bus", hc["Bus No"].tolist(), key="pax_bus")
+        if len(hc):
+            bus = st.selectbox("Bus", hc["Bus No"].tolist(), key="pax_bus")
+
+    if not bus:
+        rows_p = []
+        for _, bb in fl.iterrows():
+            sc = sc_all[sc_all["Bus No"] == bb["Bus No"]]
+            cnt = man[man["Bus No"] == bb["Bus No"]]["Pickup Location"].replace("", "(not set)").value_counts()
+            seen = set()
+            for loc, tm_ in zip(sc["Pickup Location"], sc["Pickup Time"]):
+                rows_p.append((bb["Bus No"], loc, tm_, int(cnt.get(loc, 0))))
+                seen.add(loc)
+            for loc, v in cnt.items():
+                if loc not in seen:
+                    rows_p.append((bb["Bus No"], loc, "—", int(v)))
+        ph = pd.DataFrame(rows_p, columns=["Bus No", "Pickup Location", "Pickup Time", "Headcount"])
+        if gq and len(ph):
+            ph = ph[contains(ph, gq)]
+        with st.container(key="card_ph"):
+            st.markdown('<div class="card-t">📍 Headcount by pickup point</div>', unsafe_allow_html=True)
+            st.caption(f"{int(ph['Headcount'].sum())} passenger(s) across {len(ph)} pickup point(s). Points with 0 have no employee assigned yet.")
+            st.dataframe(ph, hide_index=True, use_container_width=True)
 
     if bus:
         b = FLEET[FLEET["Bus No"] == bus].iloc[0]
-        man = S.manifest if S.manifest is not None else pd.DataFrame(columns=MAN_COLS)
         mine = man[man["Bus No"] == bus]
+        tmap = dict(zip(sc_all[sc_all["Bus No"] == bus]["Pickup Location"], sc_all[sc_all["Bus No"] == bus]["Pickup Time"]))
         with st.container(key="card_pax"):
-            st.markdown(f'<div class="card-t">👥 Passengers on {esc(bus)} · {esc(b["Shift"])}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card-t">👥 Passengers on {esc(bus)} · {esc(b["Shift"])} · {len(mine)}/{SEATS} seats</div>', unsafe_allow_html=True)
             stops = stops_for(bus)
             counts = mine["Pickup Location"].value_counts()
             if len(counts):
-                st.markdown(" &nbsp;".join(f'<span class="pill" style="background:#eaf1fd;color:{BLUE}">📍 {esc(k)} · {v}</span>'
+                st.markdown(" &nbsp;".join(f'<span class="pill" style="background:#eaf1fd;color:{BLUE}">📍 {esc(k or "(not set)")} · {v}</span>'
                                            for k, v in counts.items()), unsafe_allow_html=True)
             loc_f = st.selectbox("📍 Filter by pickup location", ["All locations"] + stops)
             view = mine if loc_f == "All locations" else mine[mine["Pickup Location"] == loc_f]
             st.caption(f"{len(view)} employee(s) shown · {len(mine)} on this bus · {SEATS} seats")
 
-            W = [1.5, 2.2, 1.9, 3.2, 0.7]
+            W = [1.4, 2.0, 1.7, 3.0, 1.0, 0.6]
             hd = st.columns(W)
-            for col, t in zip(hd, ["🪪 Login", "👤 Name", "🕒 Shift", "📍 Pickup location", ""]):
+            for col, t in zip(hd, ["🪪 Login", "👤 Name", "🕒 Shift", "📍 Pickup location", "⏰ Time", ""]):
                 col.markdown(f"**{t}**")
             for idx, r in view.iterrows():
                 c = st.columns(W, vertical_alignment="center")
@@ -662,7 +770,8 @@ if nav == NAV[2]:
                 c[1].write(r["Employee Name"] or "—")
                 c[2].write(r["Shift"] or b["Shift"])
                 c[3].write(r["Pickup Location"] or "—")
-                if c[4].button("🗑️", key=f"del_{idx}", help=f"Remove {r['AMZ ID']} from {bus}"):
+                c[4].write(tmap.get(r["Pickup Location"], "—"))
+                if c[5].button("🗑️", key=f"del_{idx}", help=f"Remove {r['AMZ ID']} from {bus}"):
                     S.manifest = man.drop(idx).reset_index(drop=True)
                     save_manifest()
                     st.rerun()
@@ -709,42 +818,85 @@ if nav == NAV[2]:
                 st.warning(f"⚠️ {bus} has {len(mine)} employees but only {SEATS} seats.")
 
 # =============================================================================
-# PAGE 4 - EMPLOYEE MANIFEST
+# PAGE 4 - EMPLOYEE MANIFEST  (upload + which passengers are on which bus)
 # =============================================================================
 elif nav == NAV[3]:
-    st.caption("Upload the roster with columns: AMZ ID, Employee Name, Bus No, Pickup Location (optional: Shift).")
-    tpl = pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location", "Shift"])
-    st.download_button("Download template", tpl.to_csv(index=False), "manifest_template.csv")
-    mf = st.file_uploader("Manifest file", type=["xlsx", "xls", "csv"], key="man_file")
-    if mf is not None:
-        try:
-            d = read_upload(mf)
-            d.columns = [c.strip() for c in d.columns]
-            if "AMZ ID" not in d.columns:
-                st.error("The file needs an 'AMZ ID' column.")
-            elif S.get("man_sig") != (mf.name, mf.size):
-                S.man_sig = (mf.name, mf.size)
-                for col in MAN_COLS:
-                    if col not in d.columns:
-                        d[col] = ""
-                S.manifest = d.fillna("").reset_index(drop=True)
-                save_manifest()
-                st.rerun()
-        except Exception as e:
-            st.error(f"Could not read the file: {e}")
     m = S.manifest
-    if m is not None:
-        f1, f2 = st.columns([2, 1])
-        look = f1.text_input("Search by AMZ ID or name", value=gq)
-        v = m
-        if site != "All Sites" and "Bus No" in m.columns:
-            v = m[m["Bus No"].isin(fl["Bus No"])]
-        if look:
-            v = v[contains(v, look)]
-        f2.metric("Employees", len(v))
-        st.dataframe(v, hide_index=True, use_container_width=True)
+    with st.expander("⬆️ Upload / replace manifest", expanded=m is None or not len(m)):
+        st.caption("Columns: AMZ ID, Employee Name, Bus No, Pickup Location (optional: Shift).")
+        tpl = pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location", "Shift"])
+        st.download_button("Download template", tpl.to_csv(index=False), "manifest_template.csv")
+        mf = st.file_uploader("Manifest file", type=["xlsx", "xls", "csv"], key="man_file")
+        if mf is not None:
+            try:
+                d = read_upload(mf)
+                d.columns = [c.strip() for c in d.columns]
+                if "AMZ ID" not in d.columns:
+                    st.error("The file needs an 'AMZ ID' column.")
+                elif S.get("man_sig") != (mf.name, mf.size):
+                    S.man_sig = (mf.name, mf.size)
+                    S.manifest = clean_manifest(d)
+                    save_manifest()
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Could not read the file: {e}")
+    m = S.manifest
+
+    if m is None or not len(m):
+        st.info("No manifest uploaded yet. Upload the roster above and every bus will show its passenger list here.")
     else:
-        st.info("No manifest uploaded yet.")
+        sc_all = full_schedule()
+        mv = m[m["Bus No"].isin(fl["Bus No"])]
+        a1, a2, a3 = st.columns(3)
+        a1.metric("Employees in this view", len(mv))
+        a2.metric("Buses with passengers", int(mv["Bus No"].nunique()))
+        a3.metric("Buses over capacity", int((fl["Booked"] > SEATS).sum()))
+
+        tA, tB = st.tabs(["🚌 Passengers by bus", "📋 All employees"])
+        with tA:
+            q1, q2, q3 = st.columns([2.2, 1, 1.4], vertical_alignment="bottom")
+            look = q1.text_input("Find a passenger (name or AMZ ID)", value=gq, key="pax_find")
+            open_all = q2.toggle("Expand all buses")
+            sheets = {}
+            summary = []
+            for _, b in fl.iterrows():
+                mine = m[m["Bus No"] == b["Bus No"]]
+                summary.append((b["Bus No"], b["Shift"], b["Route"], len(mine), SEATS))
+                if len(mine):
+                    sheets[b["Bus No"]] = pax_table(mine, b["Bus No"], sc_all)
+            if sheets:
+                sm_df = pd.DataFrame(summary, columns=["Bus No", "Shift", "Route", "Assigned", "Seats"])
+                q3.download_button("📥 Bus-wise list (Excel)", to_excel({"Summary": sm_df, **sheets}),
+                                   f"passengers_by_bus_{now:%Y%m%d}.xlsx", use_container_width=True)
+
+            shown = 0
+            for _, b in fl.iterrows():
+                mine_all = m[m["Bus No"] == b["Bus No"]]
+                mine = mine_all[contains(mine_all, look)] if look else mine_all
+                if look and not len(mine):
+                    continue
+                shown += 1
+                n = len(mine_all)
+                flag = " · ⚠️ over capacity" if n > SEATS else (" · no passengers" if n == 0 else "")
+                with st.expander(f"🚌 {b['Bus No']}  ·  {b['ShiftTime']}  ·  {n}/{SEATS} seats{flag}",
+                                 expanded=bool(open_all or look)):
+                    st.caption(f"{b['Vendor']}  ·  {b['Route']}")
+                    if len(mine):
+                        st.dataframe(pax_table(mine, b["Bus No"], sc_all), hide_index=True, use_container_width=True)
+                    else:
+                        st.info("No passengers assigned to this bus.")
+            if look and not shown:
+                st.warning("No passenger matches that search in the buses shown.")
+            stray = m[~m["Bus No"].isin(set(FLEET["Bus No"]))]
+            if len(stray):
+                with st.expander(f"⚠️ Not on any known bus ({len(stray)})"):
+                    st.caption("These rows have a blank or unrecognised Bus No, so they are not counted on any bus.")
+                    st.dataframe(stray, hide_index=True, use_container_width=True)
+        with tB:
+            look2 = st.text_input("Search by AMZ ID or name", key="pax_all_find")
+            v = mv[contains(mv, look2)] if look2 else mv
+            st.caption(f"{len(v)} employee(s)")
+            st.dataframe(v, hide_index=True, use_container_width=True)
 
 st.markdown(
     '<div class="foot"><span>Amazon Employee Transport Management &nbsp;|&nbsp; DXB5, DXB3 &amp; AUH1 Sites</span>'
