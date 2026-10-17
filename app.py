@@ -8,6 +8,7 @@ from urllib.parse import quote
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="Daily Manpower & Employee Transport Tracker",
@@ -25,11 +26,21 @@ PILL = {
     "Not Started": ("#eceff4", "#5b6778"),
 }
 COORD = "+971 52 553 9471 / +971 55 530 9916"
+COORD_BY_BUS = {
+    "DXB-07": "+971 55 530 9916 / +971 52 553 9471",
+    "DXB-08": "+971 55 530 9916 / +971 52 553 9471",
+    "DXB-09": "+971 58 588 7560",
+    "DXB-10": "+971 58 588 7560",
+    "DXB-11": "+971 58 588 7560",
+}
 MAPS = {
     "DXB5": "Amazon DXB5 Dubai",
     "AUH1": "Amazon AUH1 Abu Dhabi",
     "DXB3": "Amazon DXB3 Dubai",
 }
+SEATS = 22  # every bus has 22 seats
+MANIFEST_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.csv")
+MAN_COLS = ["AMZ ID", "Employee Name", "Bus No", "Pickup Location", "Shift"]
 STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bus_status.json")
 
 # =============================================================================
@@ -69,8 +80,8 @@ FLEET_ROWS = [
 ]
 
 # Site, Shift, Bus No, Pickup Location, Pickup Time
-# Your pasted file was cut off after DXB-02, so only these rows are built in.
-# Upload the full schedule in the "Pickup Timings & Routes" tab (or add rows here).
+# Built in: DXB5 day buses DXB-01 and part of DXB-02, and all DXB5 night buses (DXB-07 to DXB-11).
+# Upload the rest in the "Pickup Timings & Routes" tab (or add rows here).
 PICKUP_ROWS = [
     ("DXB5", D8, "DXB-01", "Sahara _ ENOC Fuel Filling Station Backside Sahara Centre", "06:25 AM"),
     ("DXB5", D8, "DXB-01", "Sahara _ Foot Bridge Parking lot Near Save More Supermarket / Aster", "06:30 AM"),
@@ -82,10 +93,59 @@ PICKUP_ROWS = [
     ("DXB5", D8, "DXB-02", "International City (Near Post office Bus Stop)", "06:45 AM"),
 ]
 
+
+def _stops(site, shift, bus, items):
+    return [(site, shift, bus, loc, t) for loc, t in items]
+
+
+# DXB5 06:10 PM night shift (Mango Transport / Shahara Sky), from the pickup-time sheet
+PICKUP_ROWS += _stops("DXB5", N610, "DXB-07", [
+    ("Sahara _ Before Foot Bridge Bus Stop", "04:20 PM"),
+    ("Sahara _ Foot Bridge Bus Stop _ Near Sand area", "04:22 PM"),
+    ("Sahara _ Bus Stop _ Near Sand area", "04:24 PM"),
+    ("Sahara _ Bus Stop _ Naer ENOC Fuel Filling Station", "04:26 PM"),
+    ("DAFZA Metro _ Bus Stop Sharjah Route", "04:40 PM"),
+    ("Etisalat Metro _ Bus Stop Sharjah Route", "04:45 PM"),
+])
+PICKUP_ROWS += _stops("DXB5", N610, "DXB-08", [
+    ("Abuhail Metro _ Parking Oposit Al Kabayel Centre or Near Bus Stand Abu Hail", "04:25 PM"),
+    ("Abubacker Metro _ Bust Stoplocated Down of Metro towards to Deira Route", "04:30 PM"),
+    ("Baniyas Metro _ Parking area Metro Exit 2 near RTA building parking", "04:30 PM"),
+    ("Salah Din Metro _ Near Needs n Wants Supermarket opposite Side of Reef Mall", "04:30 PM"),
+    ("Union Metro _ Alrigga Road First Parking area opposite side Algurrair Mcdonald", "04:35 PM"),
+    ("Al Rigga Metro _ Near Barako Café / Citi Pharmacy", "04:37 PM"),
+])
+PICKUP_ROWS += _stops("DXB5", N610, "DXB-09", [
+    ("Rashidiya Metro _ Near KFC", "04:35 PM"),
+    ("International City (Near Post office Bus Stop)", "04:50 PM"),
+    ("DIP MS", "05:15 PM"),
+])
+PICKUP_ROWS += _stops("DXB5", N610, "DXB-10", [
+    ("Al Ghubaiba Palm City Hotel", "04:30 PM"),
+    ("Al Fahidi Or Sharaf DG Metro Station", "04:33 PM"),
+    ("Burjuman Metro _ Near Carrfour", "04:40 PM"),
+    ("ADCB MS", "04:45 PM"),
+    ("Financial Center", "04:10 PM"),
+    ("Noor Bank/ Al Safa OR Onpassive MS", "04:15 PM"),
+    ("Mall of Emirates", "04:25 PM"),
+    ("Dubai Internet City Metro Station", "04:30 PM"),
+    ("Discovery Gardens", "04:45 PM"),
+    ("Satwa, Round about Near Kabab Rolls Restaurant", "04:55 PM"),
+])
+PICKUP_ROWS += _stops("DXB5", N610, "DXB-11", [
+    ("Dulsco Village Camp Alquoz", "04:55 PM"),
+    ("EFS Male Camp Jabel Ali/Parco", "05:05 PM"),
+    ("New EFS Male Camp Jabel Ali/Parco", "05:05 PM"),
+    ("EFS Female Camp Alquoz", "04:55 PM"),
+    ("Dulsco Livon Female Camp", "05:05 PM"),
+    ("Dulsco Al Rahaba Camp Men", "05:05 PM"),
+])
+
 FLEET = pd.DataFrame(
     FLEET_ROWS,
     columns=["Site", "Shift", "Bus No", "Plate No", "Route", "Capacity", "Booked", "Vendor", "Driver Name", "Phone"],
 )
+FLEET["Capacity"] = SEATS
 FLEET["Phone"] = "971" + FLEET["Phone"]
 FLEET["AMPM"] = FLEET["Shift"].map(lambda s: "PM" if "Night" in s else "AM")
 FLEET["ShiftTime"] = FLEET["Shift"].str.extract(r"\((.*)\)")[0]
@@ -114,8 +174,23 @@ def save_status():
         pass
 
 
+def load_manifest():
+    try:
+        d = pd.read_csv(MANIFEST_FILE, dtype=str).fillna("")
+        return d if len(d) else None
+    except Exception:
+        return None
+
+
+def save_manifest():
+    try:
+        (S.manifest if S.manifest is not None else pd.DataFrame(columns=MAN_COLS)).to_csv(MANIFEST_FILE, index=False)
+    except Exception:
+        pass
+
+
 S.setdefault("status", load_status())
-S.setdefault("manifest", None)
+S.setdefault("manifest", load_manifest())
 S.setdefault("sched_up", None)
 
 
@@ -135,7 +210,7 @@ def full_schedule():
         p = pd.concat([p[~p["Bus No"].isin(up["Bus No"])], up], ignore_index=True)
     vend = FLEET.set_index("Bus No")["Vendor"]
     p["Vendor"] = p["Bus No"].map(vend)
-    p["Coordinator"] = COORD
+    p["Coordinator"] = p["Bus No"].map(COORD_BY_BUS).fillna(COORD)
     return p
 
 
@@ -159,20 +234,36 @@ st.markdown(
 <style>
 [data-testid="stSidebar"], [data-testid="collapsedControl"] {{display:none !important;}}
 .stApp {{background:#f3f5fa;}}
-.block-container {{padding-top:1rem; padding-bottom:2rem; max-width:1500px;}}
+.block-container {{padding-top:4.5rem; padding-bottom:2rem; max-width:1500px;}}
 .st-key-hdr {{background:linear-gradient(90deg,{NAVY},#1d3a66); border-radius:14px; padding:10px 22px; color:#fff;}}
 .hdr-title {{font-size:21px; font-weight:700; line-height:1.2;}}
 .hdr-sub {{font-size:12px; opacity:.85;}}
 .logo {{font-size:30px; font-weight:800; letter-spacing:-1px; margin-right:14px;}}
 .logo span {{color:{ORANGE};}}
 [class*="st-key-card"] {{background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(20,40,75,.08);}}
-.kpi {{display:flex; gap:14px; align-items:center; background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(20,40,75,.08); min-height:112px;}}
+.kpi {{display:flex; gap:14px; align-items:center; background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(20,40,75,.08); height:124px; box-sizing:border-box;}}
 .kpi .ic {{width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px;}}
 .kpi .lb {{font-weight:600; color:{NAVY};}} .kpi .v {{font-size:32px; font-weight:800; color:{NAVY}; line-height:1.1;}}
 .kpi .sb {{font-size:12px; color:#6b7686;}}
 .bar {{height:7px; background:#e8ebf2; border-radius:5px; margin-top:6px;}} .bar div {{height:7px; border-radius:5px; background:{ORANGE};}}
 .card-t {{font-size:17px; font-weight:700; color:{NAVY}; margin:0 0 6px 0;}}
 .pill {{padding:2px 10px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap;}}
+.bgrid {{display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:10px; max-height:400px; overflow-y:auto; padding-right:4px;}}
+.bc {{border:1px solid #e8ebf2; border-radius:12px; padding:10px 12px; background:#fff;}}
+.bh {{display:flex; justify-content:space-between; align-items:center; color:{NAVY}; font-size:13px;}}
+.seats {{display:grid; grid-template-columns:repeat(11,1fr); gap:3px; margin:9px 0;}}
+.seats i {{aspect-ratio:1; border-radius:3px; background:#dfe6f3;}} .seats i.f {{background:{ORANGE};}}
+.bf {{display:flex; justify-content:space-between; font-size:12px; color:#5b6778;}}
+.bf .ok {{color:#1a8a45; font-weight:700;}} .bf .ov {{color:#c62828; font-weight:700;}}
+.lg {{font-size:12px; color:#5b6778; margin:2px 0 8px;}}
+[class*="st-key-qa_"] {{border-radius:12px; padding:2px 8px; margin-bottom:8px;}}
+.st-key-qa_export {{background:#eaf1fd; border-left:5px solid {BLUE};}}
+.st-key-qa_wa {{background:#e6f7ec; border-left:5px solid #25a55a;}}
+.st-key-qa_delay {{background:#fff3e0; border-left:5px solid {ORANGE};}}
+.st-key-qa_print {{background:#f1ecfb; border-left:5px solid #7c4dcc;}}
+[class*="st-key-qa_"] button {{border:0 !important; background:transparent !important; justify-content:flex-start; font-weight:700; color:{NAVY};}}
+[class*="st-key-qa_"] details {{border:0 !important;}}
+[class*="st-key-qa_"] summary {{font-weight:700; color:{NAVY};}}
 .fs {{max-height:300px; overflow-y:auto;}}
 .fs-row {{display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f2f7; font-size:13px; color:{NAVY};}}
 .tbl-wrap {{overflow-x:auto;}}
@@ -212,6 +303,8 @@ with st.container(key="hdr"):
 
 fleet = FLEET.copy()
 fleet["Status"] = fleet["Bus No"].map(lambda b: S.status.get(b, "On Route"))
+if S.manifest is not None and len(S.manifest) and "Bus No" in S.manifest.columns:
+    fleet["Booked"] = fleet["Bus No"].map(S.manifest["Bus No"].value_counts()).fillna(0).astype(int)
 fl = fleet if site == "All Sites" else fleet[fleet["Site"] == site]
 sched = full_schedule()
 sched = sched if site == "All Sites" else sched[sched["Site"] == site]
@@ -233,10 +326,10 @@ with tab1:
         f'<div class="kpi"><div class="ic" style="background:#dde9fb">🚌</div><div><div class="lb">Total Buses</div>'
         f'<div class="v">{nbus}</div><div class="sb">Active Fleet</div></div></div>', unsafe_allow_html=True)
     k2.markdown(
-        f'<div class="kpi" style="display:block"><div style="display:flex;gap:14px;align-items:center">'
-        f'<div class="ic" style="background:#fde9d2">👥</div><div><div class="lb">Total Assigned Passengers</div>'
-        f'<div class="v">{booked}</div><div class="sb">of {cap} Seats ({pct:.0%})</div></div></div>'
-        f'<div class="bar"><div style="width:{pct*100:.0f}%"></div></div></div>', unsafe_allow_html=True)
+        f'<div class="kpi"><div class="ic" style="background:#fde9d2">👥</div><div style="flex:1">'
+        f'<div class="lb">Total Assigned Passengers</div><div class="v">{booked}</div>'
+        f'<div class="sb">of {cap} Seats ({pct:.0%})</div>'
+        f'<div class="bar"><div style="width:{min(pct, 1)*100:.0f}%"></div></div></div></div>', unsafe_allow_html=True)
     k3.markdown(
         f'<div class="kpi"><div class="ic" style="background:#dde9fb">💺</div><div><div class="lb">Total Seat Capacity</div>'
         f'<div class="v">{cap}</div><div class="sb">Across {nbus} Buses</div></div></div>', unsafe_allow_html=True)
@@ -248,23 +341,24 @@ with tab1:
 
     with left:
         with st.container(key="card_chart"):
-            c1, c2 = st.columns([3, 1.6], vertical_alignment="center")
-            c1.markdown('<div class="card-t">📊 Bus Seat Capacity vs Assigned Passengers</div>', unsafe_allow_html=True)
-            mode = c2.radio("View", ["By Bus", "By Location"], horizontal=True, label_visibility="collapsed")
-            if mode == "By Bus":
-                g = fl[["Bus No", "Capacity", "Booked"]].rename(columns={"Bus No": "k"})
-            else:
-                key = "Site" if site == "All Sites" else "Shift"
-                g = fl.groupby(key, as_index=False)[["Capacity", "Booked"]].sum().rename(columns={key: "k"})
-            fig = go.Figure()
-            fig.add_bar(x=g["k"], y=g["Capacity"], name="Seat Capacity", marker_color=BLUE,
-                        text=g["Capacity"], textposition="outside")
-            fig.add_bar(x=g["k"], y=g["Booked"], name="Assigned Passengers", marker_color=ORANGE,
-                        text=g["Booked"], textposition="outside")
-            fig.update_layout(barmode="group", height=340, margin=dict(l=10, r=10, t=30, b=10),
-                              legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
-                              plot_bgcolor="white", paper_bgcolor="white", yaxis=dict(gridcolor="#e6e9f0"))
-            st.plotly_chart(fig, use_container_width=True)
+            st.markdown(f'<div class="card-t">💺 Seat Map · {SEATS} seats per bus</div>', unsafe_allow_html=True)
+            d1, d2 = st.columns([1, 3], vertical_alignment="center")
+            filled = min(booked, cap)
+            fig = go.Figure(go.Pie(values=[filled, max(cap - filled, 0)], hole=0.72, sort=False, textinfo="none",
+                                   marker=dict(colors=[ORANGE, "#dfe6f3"]), hoverinfo="skip"))
+            fig.update_layout(height=230, margin=dict(l=0, r=0, t=0, b=0), showlegend=False, paper_bgcolor="white",
+                              annotations=[dict(text=f"<b>{pct:.0%}</b><br>seats filled", showarrow=False, font=dict(size=17, color=NAVY))])
+            d1.plotly_chart(fig, use_container_width=True)
+            cards = []
+            for _, b in fl.iterrows():
+                a_, over = int(b["Booked"]), int(b["Booked"]) - SEATS
+                dots = "".join(f'<i class="{"f" if i < min(a_, SEATS) else ""}"></i>' for i in range(SEATS))
+                tag = f'<span class="ov">+{over} over</span>' if over > 0 else f'<span class="ok">{SEATS - a_} free</span>'
+                cards.append(
+                    f'<div class="bc"><div class="bh"><b>🚌 {esc(b["Bus No"])}</b>{pill(b["Status"])}</div>'
+                    f'<div class="seats">{dots}</div><div class="bf"><span>{a_} / {SEATS} seats</span>{tag}</div></div>')
+            d2.markdown('<div class="lg">🟧 Assigned &nbsp; ⬜ Free seat</div><div class="bgrid">' + "".join(cards) + "</div>",
+                        unsafe_allow_html=True)
 
         with st.container(key="card_sched"):
             s1, s2 = st.columns([4, 1], vertical_alignment="center")
@@ -309,30 +403,35 @@ with tab1:
                     st.rerun()
 
         with st.container(key="card_map"):
-            st.markdown('<div class="card-t">📍 Live Map</div>', unsafe_allow_html=True)
-            st.caption("Open the site in Google Maps. Live bus positions come from each driver's WhatsApp location.")
-            for s_name, q in MAPS.items():
-                if site in ("All Sites", s_name):
-                    st.link_button(f"View {s_name} Map", f"https://www.google.com/maps/search/?api=1&query={quote(q)}",
-                                   use_container_width=True)
+            msite = "DXB5" if site == "All Sites" else site
+            st.markdown(f'<div class="card-t">📍 Live Map · {msite}</div>', unsafe_allow_html=True)
+            components.html(
+                f'<iframe src="https://maps.google.com/maps?q={quote(MAPS[msite])}&z=13&output=embed" width="100%" '
+                f'height="240" style="border:0;border-radius:12px" loading="lazy"></iframe>', height=250)
+            st.link_button("🗺️ Open full map", f"https://www.google.com/maps/search/?api=1&query={quote(MAPS[msite])}",
+                           use_container_width=True)
 
         with st.container(key="card_qa"):
-            st.markdown('<div class="card-t">Quick Actions</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-t">⚡ Quick Actions</div>', unsafe_allow_html=True)
             report = to_excel({"Fleet": fl.drop(columns=["AMPM", "ShiftTime", "Live"]), "Pickups": sched})
-            st.download_button("📄 Export Report (Excel)", report, f"transport_report_{now:%Y%m%d}.xlsx",
-                               use_container_width=True)
-            with st.expander("💬 Send WhatsApp to All Drivers"):
-                msg = st.text_input("Message", "Good morning, please share your live location.")
-                st.markdown("\n".join(
-                    f"- [{r['Bus No']} · {r['Driver Name']}](https://wa.me/{r['Phone']}?text={quote(msg)})"
-                    for _, r in fl.iterrows()))
-            with st.expander(f"⚠️ View Delayed Buses ({len(delayed)})"):
-                if len(delayed):
-                    st.dataframe(delayed[["Bus No", "Route", "Vendor", "Driver Name", "Phone"]], hide_index=True)
-                else:
-                    st.success("No delayed buses.")
-            man = S.manifest if S.manifest is not None else pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location"])
-            st.download_button("🖨️ Print Manifest (CSV)", man.to_csv(index=False), "manifest.csv", use_container_width=True)
+            with st.container(key="qa_export"):
+                st.download_button("📥  Export Report (Excel)", report, f"transport_report_{now:%Y%m%d}.xlsx",
+                                   use_container_width=True)
+            with st.container(key="qa_wa"):
+                with st.expander("💬  WhatsApp All Drivers"):
+                    msg = st.text_input("Message", "Good morning, please share your live location.")
+                    st.markdown("\n".join(
+                        f"- [{r['Bus No']} · {r['Driver Name']}](https://wa.me/{r['Phone']}?text={quote(msg)})"
+                        for _, r in fl.iterrows()))
+            with st.container(key="qa_delay"):
+                with st.expander(f"🚨  Delayed Buses ({len(delayed)})"):
+                    if len(delayed):
+                        st.dataframe(delayed[["Bus No", "Route", "Vendor", "Driver Name", "Phone"]], hide_index=True)
+                    else:
+                        st.success("✅ No delayed buses.")
+            with st.container(key="qa_print"):
+                man = S.manifest if S.manifest is not None else pd.DataFrame(columns=["AMZ ID", "Employee Name", "Bus No", "Pickup Location"])
+                st.download_button("🖨️  Print Manifest (CSV)", man.to_csv(index=False), "manifest.csv", use_container_width=True)
 
 # =============================================================================
 # TAB 2 - PICKUP TIMINGS & ROUTES
@@ -372,28 +471,108 @@ with tab2:
                     if "Shift" not in d:
                         d["Shift"] = d["Bus No"].map(lk["Shift"])
                     S.sched_up = d[["Site", "Shift", "Bus No", "Pickup Location", "Pickup Time"]].dropna(subset=["Bus No"])
-                    st.success(f"Loaded {len(S.sched_up)} pickup rows. Switch tabs to refresh.")
+                    if S.get("sched_sig") != (up.name, up.size):
+                        S.sched_sig = (up.name, up.size)
+                        st.rerun()
+                    st.success(f"Loaded {len(S.sched_up)} pickup rows.")
             except Exception as e:
                 st.error(f"Could not read the file: {e}")
 
 # =============================================================================
-# TAB 3 - PICKUP HEADCOUNTS
+# TAB 3 - PICKUP HEADCOUNTS  (click a bus to see / edit who is travelling)
 # =============================================================================
+def stops_for(bus_no):
+    route = FLEET.loc[FLEET["Bus No"] == bus_no, "Route"].iloc[0]
+    known = full_schedule().query("`Bus No` == @bus_no")["Pickup Location"].tolist()
+    return list(dict.fromkeys(known + route.split(" / ")))
+
+
 with tab3:
-    hc = fl[["Site", "Shift", "Bus No", "Route", "Capacity", "Booked"]].copy()
+    hc = fl[["Site", "Shift", "Bus No", "Route", "Capacity", "Booked"]].copy().reset_index(drop=True)
     hc["Free Seats"] = hc["Capacity"] - hc["Booked"]
     hc["Occupancy"] = (hc["Booked"] / hc["Capacity"] * 100).round(0)
-    st.dataframe(
-        hc, hide_index=True, use_container_width=True,
-        column_config={"Occupancy": st.column_config.ProgressColumn("Occupancy %", min_value=0, max_value=100, format="%d%%")},
-    )
-    m = S.manifest
-    if m is not None and "Pickup Location" in m.columns:
-        st.markdown("**Headcount per pickup location (from manifest)**")
-        pc = m.groupby(["Bus No", "Pickup Location"]).size().reset_index(name="Employees")
-        st.dataframe(pc, hide_index=True, use_container_width=True)
-    else:
-        st.info("Upload the employee manifest (with a Pickup Location column) to see headcount per pickup point.")
+    st.caption("👆 Click a bus row to see who is travelling. You can add, remove or move employees below it.")
+    bus = None
+    cfg = {"Occupancy": st.column_config.ProgressColumn("Occupancy %", min_value=0, max_value=100, format="%d%%")}
+    try:
+        ev = st.dataframe(hc, hide_index=True, use_container_width=True, on_select="rerun",
+                          selection_mode="single-row", key="hc_tbl", column_config=cfg)
+        if ev.selection.rows:
+            bus = hc.iloc[ev.selection.rows[0]]["Bus No"]
+    except TypeError:  # older Streamlit without row selection
+        st.dataframe(hc, hide_index=True, use_container_width=True, column_config=cfg)
+        bus = st.selectbox("Bus", hc["Bus No"].tolist(), key="pax_bus")
+
+    if bus:
+        b = FLEET[FLEET["Bus No"] == bus].iloc[0]
+        man = S.manifest if S.manifest is not None else pd.DataFrame(columns=MAN_COLS)
+        mine = man[man["Bus No"] == bus]
+        with st.container(key="card_pax"):
+            st.markdown(f'<div class="card-t">👥 Passengers on {esc(bus)} · {esc(b["Shift"])}</div>', unsafe_allow_html=True)
+            stops = stops_for(bus)
+            counts = mine["Pickup Location"].value_counts()
+            if len(counts):
+                st.markdown(" &nbsp;".join(f'<span class="pill" style="background:#eaf1fd;color:{BLUE}">📍 {esc(k)} · {v}</span>'
+                                           for k, v in counts.items()), unsafe_allow_html=True)
+            loc_f = st.selectbox("📍 Filter by pickup location", ["All locations"] + stops)
+            view = mine if loc_f == "All locations" else mine[mine["Pickup Location"] == loc_f]
+            st.caption(f"{len(view)} employee(s) shown · {len(mine)} on this bus · {SEATS} seats")
+
+            W = [1.5, 2.2, 1.9, 3.2, 0.7]
+            hd = st.columns(W)
+            for col, t in zip(hd, ["🪪 Login", "👤 Name", "🕒 Shift", "📍 Pickup location", ""]):
+                col.markdown(f"**{t}**")
+            for idx, r in view.iterrows():
+                c = st.columns(W, vertical_alignment="center")
+                c[0].write(r["AMZ ID"])
+                c[1].write(r["Employee Name"] or "—")
+                c[2].write(r["Shift"] or b["Shift"])
+                c[3].write(r["Pickup Location"] or "—")
+                if c[4].button("🗑️", key=f"del_{idx}", help=f"Remove {r['AMZ ID']} from {bus}"):
+                    S.manifest = man.drop(idx).reset_index(drop=True)
+                    save_manifest()
+                    st.rerun()
+            if not len(view):
+                st.info("No employees here yet. Add one below or upload the manifest.")
+
+            with st.form("add_emp", clear_on_submit=True):
+                st.markdown("**➕ Add employee to this bus**")
+                f = st.columns([1.5, 2.2, 1.9, 3.2, 0.9], vertical_alignment="bottom")
+                n_id = f[0].text_input("Login / AMZ ID")
+                n_name = f[1].text_input("Name")
+                shifts = list(dict.fromkeys(FLEET["Shift"]))
+                n_shift = f[2].selectbox("Shift", shifts, index=shifts.index(b["Shift"]))
+                n_loc = f[3].selectbox("Pickup location", stops)
+                go_add = f[4].form_submit_button("➕ Add")
+            if go_add:
+                n_id = n_id.strip()
+                dup = man[man["AMZ ID"].str.lower() == n_id.lower()]
+                if not n_id:
+                    st.error("Enter the employee login / AMZ ID.")
+                elif len(dup):
+                    st.error(f"{n_id} is already on {dup.iloc[0]['Bus No']}. Use 'Move employee' below instead.")
+                else:
+                    row = pd.DataFrame([[n_id, n_name.strip(), bus, n_loc, n_shift]], columns=MAN_COLS)
+                    S.manifest = pd.concat([man, row], ignore_index=True)
+                    save_manifest()
+                    st.rerun()
+
+            if len(mine):
+                with st.expander("🔁 Move an employee to another bus or location"):
+                    m1, m2, m3, m4 = st.columns([2.4, 1.4, 2.6, 1], vertical_alignment="bottom")
+                    emp = m1.selectbox("Employee", list(mine.index),
+                                       format_func=lambda i: f"{mine.loc[i, 'AMZ ID']} · {mine.loc[i, 'Employee Name']}")
+                    buses = FLEET["Bus No"].tolist()
+                    nb = m2.selectbox("To bus", buses, index=buses.index(bus))
+                    nl = m3.selectbox("New pickup location", stops_for(nb))
+                    if m4.button("🔁 Move"):
+                        man.loc[emp, ["Bus No", "Pickup Location", "Shift"]] = [
+                            nb, nl, FLEET.loc[FLEET["Bus No"] == nb, "Shift"].iloc[0]]
+                        S.manifest = man
+                        save_manifest()
+                        st.rerun()
+            if len(mine) > SEATS:
+                st.warning(f"⚠️ {bus} has {len(mine)} employees but only {SEATS} seats.")
 
 # =============================================================================
 # TAB 4 - EMPLOYEE MANIFEST
@@ -409,8 +588,14 @@ with tab4:
             d.columns = [c.strip() for c in d.columns]
             if "AMZ ID" not in d.columns:
                 st.error("The file needs an 'AMZ ID' column.")
-            else:
-                S.manifest = d
+            elif S.get("man_sig") != (mf.name, mf.size):
+                S.man_sig = (mf.name, mf.size)
+                for col in MAN_COLS:
+                    if col not in d.columns:
+                        d[col] = ""
+                S.manifest = d.fillna("").reset_index(drop=True)
+                save_manifest()
+                st.rerun()
         except Exception as e:
             st.error(f"Could not read the file: {e}")
     m = S.manifest
